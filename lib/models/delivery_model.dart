@@ -92,6 +92,9 @@ class DeliveryModel {
   final double? pickupLng;
   final double? destinationLat;
   final double? destinationLng;
+  final String? paymentMethod;
+  final String? paymentStatus;
+  final String? receiptUrl;
 
   DeliveryModel({
     required this.id,
@@ -115,6 +118,9 @@ class DeliveryModel {
     this.pickupLng,
     this.destinationLat,
     this.destinationLng,
+    this.paymentMethod,
+    this.paymentStatus,
+    this.receiptUrl,
   });
 
   factory DeliveryModel.fromJson(Map<String, dynamic> json) {
@@ -159,6 +165,9 @@ class DeliveryModel {
       pickupLng: (data['pickupLongitude'] as num? ?? data['pickupLng'] as num?)?.toDouble(),
       destinationLat: (data['destinationLatitude'] as num? ?? data['destinationLat'] as num?)?.toDouble(),
       destinationLng: (data['destinationLongitude'] as num? ?? data['destinationLng'] as num?)?.toDouble(),
+      paymentMethod: data['paymentMethod'] as String? ?? (data['order']?['paymentMethod'] as String?),
+      paymentStatus: data['paymentStatus'] as String? ?? (data['order']?['paymentStatus'] as String?),
+      receiptUrl: data['receiptUrl'] as String? ?? (data['order']?['receiptUrl'] as String?),
     );
   }
 
@@ -186,6 +195,9 @@ class DeliveryModel {
       'pickupLongitude': pickupLng,
       'destinationLatitude': destinationLat,
       'destinationLongitude': destinationLng,
+      'paymentMethod': paymentMethod,
+      'paymentStatus': paymentStatus,
+      'receiptUrl': receiptUrl,
     };
   }
 }

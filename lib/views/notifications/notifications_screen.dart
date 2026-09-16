@@ -127,7 +127,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                                   Text(
                                     notif.createdAt != null
                                         ? Formatters.time(notif.createdAt)
-                                        : _getMockTime(index),
+                                        : 'Just now',
                                     style: const TextStyle(
                                       fontSize: 11,
                                       color: AppColors.textMuted,
@@ -182,8 +182,4 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     return Icons.notifications_active_rounded;
   }
 
-  String _getMockTime(int index) {
-    final times = ['10:48 AM', '10:45 AM', '10:35 AM', '10:35 AM', '10:30 AM'];
-    return times[index % times.length];
-  }
 }

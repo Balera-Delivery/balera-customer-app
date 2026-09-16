@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
@@ -60,6 +61,132 @@ class DeliveryDetailsScreen extends StatelessWidget {
               if (delivery.cancellationReason != null) ...[
                 const SizedBox(height: 16),
                 _buildDetailSection('Cancellation Reason', delivery.cancellationReason!),
+              ],
+              const Divider(height: 28, color: Color(0xFFF1F5F9)),
+
+              // Payment & Receipt Section
+              if (delivery.paymentMethod != null || delivery.receiptUrl != null) ...[
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            children: const [
+                              Icon(Icons.payment_rounded, size: 16, color: AppColors.primary),
+                              SizedBox(width: 6),
+                              Text(
+                                'Payment & Receipt',
+                                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.textPrimary),
+                              ),
+                            ],
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2.5),
+                            decoration: BoxDecoration(
+                              color: (delivery.paymentStatus == 'VERIFIED_PAID' || delivery.paymentStatus == 'Paid')
+                                  ? const Color(0xFFDCFCE7)
+                                  : const Color(0xFFFEF3C7),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text(
+                              delivery.paymentStatus ?? 'Pending Verification',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                color: (delivery.paymentStatus == 'VERIFIED_PAID' || delivery.paymentStatus == 'Paid')
+                                    ? const Color(0xFF166534)
+                                    : const Color(0xFF92400E),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text('Method:', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                          Text(
+                            delivery.paymentMethod ?? 'Direct Transfer',
+                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+                          ),
+                        ],
+                      ),
+                      if (delivery.receiptUrl != null) ...[
+                        const SizedBox(height: 10),
+                        InkWell(
+                          onTap: () {
+                            showDialog(
+                              context: context,
+                              builder: (ctx) => Dialog(
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                clipBehavior: Clip.antiAlias,
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    AppBar(
+                                      title: const Text('Payment Receipt', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                                      automaticallyImplyLeading: false,
+                                      actions: [
+                                        IconButton(
+                                          icon: const Icon(Icons.close_rounded),
+                                          onPressed: () => Navigator.pop(ctx),
+                                        ),
+                                      ],
+                                    ),
+                                    Container(
+                                      color: const Color(0xFF0F172A),
+                                      constraints: const BoxConstraints(maxHeight: 500),
+                                      alignment: Alignment.center,
+                                      child: InteractiveViewer(
+                                        panEnabled: true,
+                                        minScale: 0.8,
+                                        maxScale: 4.0,
+                                        child: _buildReceiptImage(delivery.receiptUrl!),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: const Color(0xFFCBD5E1)),
+                            ),
+                            child: Row(
+                              children: const [
+                                Icon(Icons.receipt_long_rounded, size: 16, color: AppColors.primary),
+                                SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    'View Uploaded Transfer Slip',
+                                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.primary),
+                                  ),
+                                ),
+                                Icon(Icons.open_in_new_rounded, size: 14, color: AppColors.primary),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
               ],
               const Divider(height: 32, color: Color(0xFFF1F5F9)),
 
@@ -333,4 +460,37 @@ class DeliveryDetailsScreen extends StatelessWidget {
       ],
     );
   }
+
+  Widget _buildReceiptImage(String receiptUrl) {
+    if (receiptUrl.startsWith('data:image')) {
+      try {
+        final commaIndex = receiptUrl.indexOf(',');
+        final base64Data = commaIndex != -1 ? receiptUrl.substring(commaIndex + 1) : receiptUrl;
+        final bytes = base64Decode(base64Data);
+        return Image.memory(
+          bytes,
+          fit: BoxFit.contain,
+          errorBuilder: (_, __, ___) => const Padding(
+            padding: EdgeInsets.all(32.0),
+            child: Text('Could not render receipt image', style: TextStyle(color: Colors.white70)),
+          ),
+        );
+      } catch (e) {
+        return Padding(
+          padding: const EdgeInsets.all(32.0),
+          child: Text('Error decoding image: $e', style: const TextStyle(color: Colors.white70)),
+        );
+      }
+    }
+
+    return Image.network(
+      receiptUrl,
+      fit: BoxFit.contain,
+      errorBuilder: (_, __, ___) => const Padding(
+        padding: EdgeInsets.all(32.0),
+        child: Text('Receipt Image Preview', style: TextStyle(color: Colors.white70)),
+      ),
+    );
+  }
+
 }

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../data/mock_data.dart';
 import '../models/notification_model.dart';
 import '../services/notification_service.dart';
 
@@ -33,9 +32,7 @@ class NotificationProvider extends ChangeNotifier {
       _errorMessage = null;
     } else {
       _errorMessage = response.message.isNotEmpty ? response.message : 'Failed to load notifications.';
-      if (_notifications.isEmpty) {
-        _notifications = List.from(MockData.initialNotifications);
-      }
+      // Keep live notifications array clean without mock fallbacks
     }
 
     _isLoading = false;

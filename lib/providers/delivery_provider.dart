@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../core/constants/app_constants.dart';
-import '../data/mock_data.dart';
 import '../models/delivery_model.dart';
 import '../services/delivery_service.dart';
 
@@ -24,10 +23,15 @@ class DeliveryProvider extends ChangeNotifier {
   String? draftReceiverName;
   String? draftReceiverPhone;
   String? draftInstructions;
-  double draftPickupLat = 8.9953;
-  double draftPickupLng = 38.7889;
-  double draftDestinationLat = 9.0348;
-  double draftDestinationLng = 38.7525;
+  double? draftFoodPrice;
+  String? draftRestaurantName;
+  String? draftRestaurantId;
+  String? draftPaymentMethod;
+  String? draftReceiptUrl;
+  double draftPickupLat = 7.0083;
+  double draftPickupLng = 39.9833;
+  double draftDestinationLat = 7.0125;
+  double draftDestinationLng = 39.9789;
 
   List<DeliveryModel> get deliveries => _deliveries;
   DeliveryModel? get activeDelivery =>
@@ -76,11 +80,6 @@ class DeliveryProvider extends ChangeNotifier {
       _errorMessage = null;
     } else {
       _errorMessage = response.message.isNotEmpty ? response.message : 'Failed to load deliveries.';
-      // If list is empty and failed (e.g. offline preview), fallback to mock data
-      if (_deliveries.isEmpty) {
-        _deliveries.addAll(MockData.initialDeliveries);
-        _activeDelivery = _deliveries.first;
-      }
     }
 
     _isLoading = false;
@@ -95,10 +94,15 @@ class DeliveryProvider extends ChangeNotifier {
     String? receiverName,
     String? receiverPhone,
     String? instructions,
+    double? foodPrice,
+    String? restaurantName,
+    String? restaurantId,
     double? pickupLat,
     double? pickupLng,
     double? destinationLat,
     double? destinationLng,
+    String? paymentMethod,
+    String? receiptUrl,
   }) {
     if (pickup != null) draftPickup = pickup;
     if (destination != null) draftDestination = destination;
@@ -107,10 +111,15 @@ class DeliveryProvider extends ChangeNotifier {
     if (receiverName != null) draftReceiverName = receiverName;
     if (receiverPhone != null) draftReceiverPhone = receiverPhone;
     if (instructions != null) draftInstructions = instructions;
+    if (foodPrice != null) draftFoodPrice = foodPrice;
+    if (restaurantName != null) draftRestaurantName = restaurantName;
+    if (restaurantId != null) draftRestaurantId = restaurantId;
     if (pickupLat != null) draftPickupLat = pickupLat;
     if (pickupLng != null) draftPickupLng = pickupLng;
     if (destinationLat != null) draftDestinationLat = destinationLat;
     if (destinationLng != null) draftDestinationLng = destinationLng;
+    if (paymentMethod != null) draftPaymentMethod = paymentMethod;
+    if (receiptUrl != null) draftReceiptUrl = receiptUrl;
     notifyListeners();
   }
 
@@ -123,6 +132,11 @@ class DeliveryProvider extends ChangeNotifier {
     draftReceiverName = null;
     draftReceiverPhone = null;
     draftInstructions = null;
+    draftFoodPrice = null;
+    draftRestaurantName = null;
+    draftRestaurantId = null;
+    draftPaymentMethod = null;
+    draftReceiptUrl = null;
     notifyListeners();
   }
 
@@ -147,6 +161,8 @@ class DeliveryProvider extends ChangeNotifier {
       receiverName: receiverN,
       receiverPhone: receiverP,
       instructions: draftInstructions,
+      paymentMethod: draftPaymentMethod,
+      receiptUrl: draftReceiptUrl,
       pickupLat: draftPickupLat,
       pickupLng: draftPickupLng,
       destinationLat: draftDestinationLat,
@@ -178,6 +194,9 @@ class DeliveryProvider extends ChangeNotifier {
         receiverPhone: receiverP,
         instructions: draftInstructions,
         status: AppConstants.statusPending,
+        paymentMethod: draftPaymentMethod,
+        paymentStatus: draftReceiptUrl != null ? 'PAID_PENDING_VERIFICATION' : 'PENDING',
+        receiptUrl: draftReceiptUrl,
         otpCode: '482913',
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
@@ -265,7 +284,7 @@ class DeliveryProvider extends ChangeNotifier {
         trackingCode: _activeDelivery!.trackingCode,
         customerId: _activeDelivery!.customerId,
         riderId: _activeDelivery!.riderId ?? 'RDR-0042',
-        rider: _activeDelivery!.rider ?? MockData.defaultRider,
+        rider: _activeDelivery!.rider,
         pickupLocation: _activeDelivery!.pickupLocation,
         destination: _activeDelivery!.destination,
         itemType: _activeDelivery!.itemType,

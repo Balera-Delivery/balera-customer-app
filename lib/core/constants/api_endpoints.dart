@@ -31,5 +31,12 @@ class ApiEndpoints {
   // General Notification Endpoints (/api/v1/notifications)
   static const String notifications = '/api/v1/notifications';
   static const String markAllNotificationsRead = '/api/v1/notifications/read-all';
+
+  // Restaurant & Food Menu Endpoints (/api/v1/restaurants, /api/v1/foods)
+  static const String restaurants = '/api/v1/restaurants';
+  static String restaurantDetails(String id) => '/api/v1/restaurants/$id';
+  static const String foods = '/api/v1/foods';
+  static const String customerFoodOrders = '/api/v1/customer/orders';
+  static String customerFoodOrderDetails(String id) => '/api/v1/customer/orders/$id';
 }
 

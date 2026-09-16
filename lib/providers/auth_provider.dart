@@ -19,7 +19,20 @@ class AuthProvider extends ChangeNotifier {
   bool get isAuthenticated => _status == AuthStatus.authenticated;
 
   AuthProvider() {
-    checkAuthState();
+    // Check and restore persistent auth state synchronously on startup
+    final token = StorageService.getToken();
+    final cachedUser = StorageService.getUser();
+
+    if (token != null && token.isNotEmpty) {
+      _status = AuthStatus.authenticated;
+      _currentUser = cachedUser;
+    } else {
+      _status = AuthStatus.unauthenticated;
+      _currentUser = null;
+    }
+
+    // Verify token with backend in background
+    _verifySessionInBackground();
   }
 
   // Initialize and check persistent login
@@ -33,8 +46,17 @@ class AuthProvider extends ChangeNotifier {
       }
       _status = AuthStatus.authenticated;
       notifyListeners();
+      await _verifySessionInBackground();
+    } else {
+      _status = AuthStatus.unauthenticated;
+      _currentUser = null;
+      notifyListeners();
+    }
+  }
 
-      // Verify token in background
+  Future<void> _verifySessionInBackground() async {
+    final token = StorageService.getToken();
+    if (token != null && token.isNotEmpty) {
       try {
         final profileRes = await _authService.getMe();
         if (profileRes.success && profileRes.data != null) {
@@ -43,12 +65,8 @@ class AuthProvider extends ChangeNotifier {
           notifyListeners();
         }
       } catch (_) {
-        // Keep cached user if offline
+        // Keep cached user and authenticated status if offline
       }
-    } else {
-      _status = AuthStatus.unauthenticated;
-      _currentUser = null;
-      notifyListeners();
     }
   }
 
@@ -67,6 +85,7 @@ class AuthProvider extends ChangeNotifier {
       _currentUser = response.data;
       _status = AuthStatus.authenticated;
       _errorMessage = null;
+      await StorageService.setOnboardingComplete(true);
       notifyListeners();
       return true;
     } else {
@@ -101,6 +120,7 @@ class AuthProvider extends ChangeNotifier {
       _currentUser = response.data;
       _status = AuthStatus.authenticated;
       _errorMessage = null;
+      await StorageService.setOnboardingComplete(true);
       notifyListeners();
       return true;
     } else {
@@ -158,6 +178,7 @@ class AuthProvider extends ChangeNotifier {
   // Logout
   Future<void> logout() async {
     await _authService.logout();
+    await StorageService.clearSession();
     _currentUser = null;
     _status = AuthStatus.unauthenticated;
     notifyListeners();

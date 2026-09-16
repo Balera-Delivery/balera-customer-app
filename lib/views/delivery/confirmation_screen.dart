@@ -2,9 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/widgets/custom_button.dart';
-import '../../core/widgets/mock_map_view.dart';
 import '../../providers/delivery_provider.dart';
-import 'request_submitted_screen.dart';
+import 'checkout_screen.dart';
 
 class ConfirmationScreen extends StatelessWidget {
   const ConfirmationScreen({super.key});
@@ -57,22 +56,6 @@ class ConfirmationScreen extends StatelessWidget {
               ),
               const SizedBox(height: 20),
 
-              // Visual Map Route Preview
-              ClipRRect(
-                borderRadius: BorderRadius.circular(16),
-                child: SizedBox(
-                  height: 160,
-                  width: double.infinity,
-                  child: MockMapView(
-                    pickupAddress: pickup,
-                    destinationAddress: destination,
-                    showRoute: true,
-                    height: 160,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 24),
-
               _buildFieldBlock('Pickup Location', pickup),
               const SizedBox(height: 16),
               _buildFieldBlock('Destination Location', destination),
@@ -83,23 +66,16 @@ class ConfirmationScreen extends StatelessWidget {
 
               const SizedBox(height: 32),
 
-              // Submit Delivery Request Button (Screen 08)
+              // Go to Checkout Button
               CustomButton(
-                text: 'Submit Delivery Request',
-                isLoading: deliveryProvider.isSubmitting,
-                onPressed: () async {
-                  final newDelivery = await deliveryProvider.createDeliveryFromDraft();
-                  if (context.mounted) {
-                    Navigator.pushReplacement(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => RequestSubmittedScreen(
-                          deliveryId: newDelivery.id,
-                          trackingCode: newDelivery.trackingCode,
-                        ),
-                      ),
-                    );
-                  }
+                text: 'Go to Checkout',
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const CheckoutScreen(),
+                    ),
+                  );
                 },
               ),
 

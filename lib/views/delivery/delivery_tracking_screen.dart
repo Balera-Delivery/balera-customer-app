@@ -5,10 +5,12 @@ import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/widgets/custom_button.dart';
+import '../../core/widgets/mock_map_view.dart';
 import '../../core/widgets/status_badge.dart';
 import '../../models/delivery_model.dart';
 import '../../providers/delivery_provider.dart';
 import 'delivery_completed_screen.dart';
+import 'live_tracking_screen.dart';
 
 class DeliveryTrackingScreen extends StatefulWidget {
   final String? deliveryId;
@@ -26,6 +28,106 @@ class DeliveryTrackingScreen extends StatefulWidget {
 
 class _DeliveryTrackingScreenState extends State<DeliveryTrackingScreen> {
   DeliveryModel? _delivery;
+  bool _hasShownCompletionDialog = false;
+
+  void _checkAndShowCompletionDialog(String status) {
+    if ((status.toUpperCase() == 'COMPLETED' || status == AppConstants.statusCompleted) && !_hasShownCompletionDialog && mounted) {
+      _hasShownCompletionDialog = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (dialogContext) {
+            return Dialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+              elevation: 8,
+              backgroundColor: Colors.white,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 72,
+                      height: 72,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF0FDF4),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: const Color(0xFF86EFAC), width: 2),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.green.withValues(alpha: 0.15),
+                            blurRadius: 16,
+                            offset: const Offset(0, 6),
+                          ),
+                        ],
+                      ),
+                      child: const Center(
+                        child: Icon(
+                          Icons.check_circle_rounded,
+                          color: Color(0xFF16A34A),
+                          size: 44,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    const Text(
+                      'Delivery Completed! 🎉',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.textPrimary,
+                        letterSpacing: -0.3,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 10),
+                    const Text(
+                      'Delivery completed, thankyou for choosing us keep in touch',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: AppColors.textSecondary,
+                        height: 1.45,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 24),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          elevation: 0,
+                        ),
+                        onPressed: () {
+                          Navigator.pop(dialogContext);
+                          Navigator.of(context).popUntil((route) => route.isFirst);
+                        },
+                        child: const Text(
+                          'Done',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      });
+    }
+  }
   Timer? _pollTimer;
   bool _isChecking = false;
   DateTime _lastCheckedTime = DateTime.now();
@@ -89,6 +191,7 @@ class _DeliveryTrackingScreenState extends State<DeliveryTrackingScreen> {
               _delivery = res.data!;
             });
             provider.setActiveDelivery(res.data!);
+            _checkAndShowCompletionDialog(res.data!.status);
 
             if (isManual) {
               ScaffoldMessenger.of(context).showSnackBar(
@@ -128,19 +231,20 @@ class _DeliveryTrackingScreenState extends State<DeliveryTrackingScreen> {
     final upper = status.toUpperCase().replaceAll('-', '_');
     switch (upper) {
       case 'PENDING':
-        return 1; // Step 2 (Admin Review) is in progress
+        return 1;
       case 'ASSIGNED':
       case 'ACCEPTED':
-        return 2; // Step 3 (Rider Heading to Pickup) is in progress
+        return 2;
       case 'ARRIVED_AT_PICKUP':
-      case 'ARRIVED':
-        return 3; // Step 4 (Rider Arrived - OTP Active!)
       case 'PICKED_UP':
+        return 3;
       case 'ON_THE_WAY':
-        return 4; // Step 5 (Package Picked Up & On the way)
+        return 4;
       case 'DELIVERED':
+      case 'ARRIVED':
+        return 5;
       case 'COMPLETED':
-        return 5; // Step 6 (Delivered & Completed)
+        return 6;
       default:
         return 1;
     }
@@ -168,8 +272,11 @@ class _DeliveryTrackingScreenState extends State<DeliveryTrackingScreen> {
     }
 
     final currentStage = _getStageIndex(active.status);
-    final isArrived = currentStage == 3;
-    final isCompleted = currentStage == 5;
+    final isArrived = currentStage == 5 || active.status == "DELIVERED" || active.status == "ARRIVED";
+    final isCompleted = currentStage == 6 || active.status.toUpperCase() == "COMPLETED";
+    if (isCompleted) {
+      _checkAndShowCompletionDialog(active.status);
+    }
     final rider = active.rider;
     final displayCode = (active.trackingCode != null && active.trackingCode!.isNotEmpty)
         ? active.trackingCode!
@@ -269,7 +376,7 @@ class _DeliveryTrackingScreenState extends State<DeliveryTrackingScreen> {
               const SizedBox(height: 16),
 
               // MAIN ACTION & ARRIVAL OTP CARD (When Rider Arrives or Active Handover)
-              if (isArrived || active.status == AppConstants.statusArrivedAtPickup || active.status == 'ARRIVED') ...[
+              if (isArrived) ...[
                 Container(
                   width: double.infinity,
                   padding: const EdgeInsets.all(18),
@@ -451,49 +558,239 @@ class _DeliveryTrackingScreenState extends State<DeliveryTrackingScreen> {
                     ),
                     _buildTimelineStep(
                       stepNumber: 2,
-                      title: 'Admin Review & Assignment',
+                      title: 'Admin Review & Rider Assignment',
                       subtitle: rider != null
-                          ? 'Rider assigned by dispatch admin.'
-                          : 'Admin is reviewing and assigning an available rider.',
+                          ? '${rider.fullName} assigned by dispatch admin.'
+                          : 'Admin is reviewing and assigning an online rider.',
                       isCompleted: currentStage > 1,
                       isActive: currentStage == 1,
-                      isLoading: currentStage == 1,
                     ),
                     _buildTimelineStep(
                       stepNumber: 3,
-                      title: 'Rider Heading to Pickup',
-                      subtitle: rider != null
-                          ? '${rider.fullName} is on the way to your pickup location.'
-                          : 'Waiting for rider to start heading to pickup.',
-                      isCompleted: currentStage > 2,
+                      title: 'Item Picked Up',
+                      subtitle: currentStage >= 3
+                          ? 'Item picked up and verified from pickup location.'
+                          : 'Rider is heading to pickup the package.',
+                      isCompleted: currentStage >= 3,
                       isActive: currentStage == 2,
                     ),
                     _buildTimelineStep(
                       stepNumber: 4,
-                      title: 'Rider Arrived at Pickup',
-                      subtitle: isArrived
-                          ? 'Rider is here! Give the OTP code to complete handover.'
-                          : 'Rider arrives and requests your 6-digit OTP code.',
-                      isCompleted: currentStage > 3,
+                      title: 'On The Way to Destination',
+                      subtitle: currentStage >= 4
+                          ? 'Rider is en route to your drop-off address.'
+                          : 'Awaiting package pickup completion.',
+                      isCompleted: currentStage >= 4,
                       isActive: currentStage == 3,
-                      highlightGreen: isArrived,
                     ),
                     _buildTimelineStep(
                       stepNumber: 5,
-                      title: 'Package Picked Up & On the Way',
-                      subtitle: 'Package verified and en route to the destination.',
-                      isCompleted: currentStage > 4,
-                      isActive: currentStage == 4,
+                      title: 'Rider Arrived at Destination',
+                      subtitle: isArrived
+                          ? 'Rider has arrived outside! Share your 6-digit OTP code.'
+                          : 'Rider arrives and requests your verification OTP.',
+                      isCompleted: currentStage >= 6,
+                      isActive: currentStage == 4 || currentStage == 5,
+                      highlightGreen: isArrived,
                     ),
                     _buildTimelineStep(
                       stepNumber: 6,
                       title: 'Delivered & Completed',
                       subtitle: isCompleted
-                          ? 'Package safely delivered to receiver.'
-                          : 'Final package handover to receiver.',
-                      isCompleted: currentStage == 5,
-                      isActive: currentStage == 5,
+                          ? 'Package safely delivered and verified via OTP! 🎉'
+                          : 'Final handover upon OTP confirmation.',
+                      isCompleted: isCompleted,
+                      isActive: false,
                       isLast: true,
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 16),
+
+              // Live Map Tracking Card Under Flow Steps
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.04),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFEFF6FF),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Icon(
+                                Icons.map_rounded,
+                                size: 18,
+                                color: AppColors.primary,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            const Text(
+                              'Live Map Tracking',
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                          ],
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF0FDF4),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: const Color(0xFFBBF7D0)),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.radar_rounded, size: 12, color: Color(0xFF16A34A)),
+                              SizedBox(width: 4),
+                              Text(
+                                'Live GPS',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF16A34A),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    const Text(
+                      'Live route and rider location from pickup to destination',
+                      style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Embedded Interactive Map Container
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(14),
+                      child: SizedBox(
+                        height: 220,
+                        width: double.infinity,
+                        child: Stack(
+                          children: [
+                            MockMapView(
+                              pickupAddress: active.pickupLocation,
+                              destinationAddress: active.destination,
+                              showRoute: true,
+                              showRider: currentStage >= 2 && currentStage < 5,
+                              height: 220,
+                            ),
+
+                            // Top Left Live ETA / Distance Badge
+                            Positioned(
+                              top: 10,
+                              left: 10,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.95),
+                                  borderRadius: BorderRadius.circular(20),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withValues(alpha: 0.1),
+                                      blurRadius: 8,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ],
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(Icons.timer_outlined, size: 14, color: AppColors.primary),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      currentStage >= 4
+                                          ? 'Arriving in ~6 mins'
+                                          : (currentStage >= 2
+                                              ? 'Heading to pickup ~8 mins'
+                                              : 'Awaiting rider assignment'),
+                                      style: const TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w700,
+                                        color: AppColors.textPrimary,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+
+                            // Top Right Fullscreen Expand Action
+                            Positioned(
+                              top: 10,
+                              right: 10,
+                              child: InkWell(
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => LiveTrackingScreen(delivery: active),
+                                    ),
+                                  );
+                                },
+                                borderRadius: BorderRadius.circular(20),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.primary,
+                                    borderRadius: BorderRadius.circular(20),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: AppColors.primary.withValues(alpha: 0.35),
+                                        blurRadius: 8,
+                                        offset: const Offset(0, 3),
+                                      ),
+                                    ],
+                                  ),
+                                  child: const Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(Icons.fullscreen_rounded, size: 16, color: Colors.white),
+                                      SizedBox(width: 4),
+                                      Text(
+                                        'Full Map',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w700,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
                   ],
                 ),
@@ -575,7 +872,6 @@ class _DeliveryTrackingScreenState extends State<DeliveryTrackingScreen> {
     required String subtitle,
     required bool isCompleted,
     required bool isActive,
-    bool isLoading = false,
     bool highlightGreen = false,
     bool isLast = false,
   }) {
@@ -584,25 +880,30 @@ class _DeliveryTrackingScreenState extends State<DeliveryTrackingScreen> {
 
     if (isCompleted) {
       bgColor = AppColors.success;
-      iconWidget = const Icon(Icons.check, size: 14, color: Colors.white);
+      iconWidget = const Icon(Icons.check, size: 15, color: Colors.white);
     } else if (isActive) {
-      if (highlightGreen) {
-        bgColor = AppColors.success;
-        iconWidget = const Icon(Icons.directions_bike_rounded, size: 14, color: Colors.white);
-      } else if (isLoading) {
-        bgColor = const Color(0xFFEFF6FF);
-        iconWidget = const SizedBox(
-          width: 12,
-          height: 12,
-          child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
-        );
-      } else {
-        bgColor = AppColors.primary;
-        iconWidget = Text(
-          '$stepNumber',
-          style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
-        );
-      }
+      bgColor = const Color(0xFFEFF6FF);
+      iconWidget = Stack(
+        alignment: Alignment.center,
+        children: [
+          const SizedBox(
+            width: 28,
+            height: 28,
+            child: CircularProgressIndicator(
+              strokeWidth: 2.5,
+              valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+            ),
+          ),
+          Text(
+            '$stepNumber',
+            style: const TextStyle(
+              color: AppColors.primary,
+              fontSize: 11,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
+      );
     } else {
       bgColor = const Color(0xFFF1F5F9);
       iconWidget = Text(
@@ -617,15 +918,15 @@ class _DeliveryTrackingScreenState extends State<DeliveryTrackingScreen> {
         Column(
           children: [
             Container(
-              width: 28,
-              height: 28,
+              width: 30,
+              height: 30,
               decoration: BoxDecoration(
                 color: bgColor,
                 shape: BoxShape.circle,
                 border: Border.all(
                   color: isCompleted
                       ? AppColors.success
-                      : (isActive ? AppColors.primary : const Color(0xFFE2E8F0)),
+                      : (isActive ? Colors.transparent : const Color(0xFFE2E8F0)),
                   width: 1.5,
                 ),
               ),
