@@ -34,7 +34,32 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           'Notifications',
           style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18),
         ),
-        automaticallyImplyLeading: false,
+        actions: [
+          if (notifications.isNotEmpty)
+            IconButton(
+              icon: const Icon(Icons.delete_sweep_outlined, color: AppColors.error),
+              tooltip: 'Clear All Notifications',
+              onPressed: () {
+                showDialog(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    title: const Text('Clear All Notifications?'),
+                    content: const Text('Are you sure you want to delete all notifications?'),
+                    actions: [
+                      TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+                      TextButton(
+                        onPressed: () {
+                          Navigator.pop(ctx);
+                          notificationProvider.clearAllNotifications();
+                        },
+                        child: const Text('Clear All', style: TextStyle(color: AppColors.error)),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+        ],
       ),
       body: SafeArea(
         child: Column(
@@ -60,81 +85,113 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                         separatorBuilder: (_, __) => const Divider(height: 18, color: Color(0xFFF1F5F9)),
                         itemBuilder: (context, index) {
                           final notif = notifications[index];
-                          return InkWell(
-                            onTap: () {
-                              if (!notif.isRead) {
-                                notificationProvider.markAsRead(notif.id);
-                              }
+                          return Dismissible(
+                            key: Key(notif.id),
+                            direction: DismissDirection.endToStart,
+                            background: Container(
+                              alignment: Alignment.centerRight,
+                              padding: const EdgeInsets.only(right: 20),
+                              color: AppColors.error,
+                              child: const Icon(Icons.delete_outline, color: Colors.white),
+                            ),
+                            onDismissed: (_) {
+                              notificationProvider.deleteNotification(notif.id);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Notification deleted'),
+                                  duration: Duration(seconds: 1),
+                                ),
+                              );
                             },
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 4.0),
-                              child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.all(10),
-                                    decoration: BoxDecoration(
-                                      color: notif.isRead ? const Color(0xFFF8FAFC) : const Color(0xFFEFF6FF),
-                                      borderRadius: BorderRadius.circular(10),
+                            child: InkWell(
+                              onTap: () {
+                                if (!notif.isRead) {
+                                  notificationProvider.markAsRead(notif.id);
+                                }
+                              },
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 4.0),
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.all(10),
+                                      decoration: BoxDecoration(
+                                        color: notif.isRead ? const Color(0xFFF8FAFC) : const Color(0xFFEFF6FF),
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                      child: Icon(
+                                        _getNotificationIcon(notif.title),
+                                        size: 20,
+                                        color: notif.isRead ? AppColors.textMuted : AppColors.primary,
+                                      ),
                                     ),
-                                    child: Icon(
-                                      _getNotificationIcon(notif.title),
-                                      size: 20,
-                                      color: notif.isRead ? AppColors.textMuted : AppColors.primary,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 14),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Row(
-                                          children: [
-                                            Expanded(
-                                              child: Text(
-                                                notif.title,
-                                                style: TextStyle(
-                                                  fontSize: 14,
-                                                  fontWeight: notif.isRead ? FontWeight.w600 : FontWeight.w800,
-                                                  color: AppColors.textPrimary,
+                                    const SizedBox(width: 14),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Row(
+                                            children: [
+                                              Expanded(
+                                                child: Text(
+                                                  notif.title,
+                                                  style: TextStyle(
+                                                    fontSize: 14,
+                                                    fontWeight: notif.isRead ? FontWeight.w600 : FontWeight.w800,
+                                                    color: AppColors.textPrimary,
+                                                  ),
                                                 ),
                                               ),
-                                            ),
-                                            if (!notif.isRead)
-                                              Container(
-                                                width: 8,
-                                                height: 8,
-                                                decoration: const BoxDecoration(
-                                                  color: AppColors.primary,
-                                                  shape: BoxShape.circle,
+                                              if (!notif.isRead)
+                                                Container(
+                                                  width: 8,
+                                                  height: 8,
+                                                  decoration: const BoxDecoration(
+                                                    color: AppColors.primary,
+                                                    shape: BoxShape.circle,
+                                                  ),
                                                 ),
-                                              ),
-                                          ],
-                                        ),
-                                        const SizedBox(height: 3),
-                                        Text(
-                                          notif.message,
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            color: notif.isRead ? AppColors.textMuted : AppColors.textSecondary,
-                                            height: 1.3,
+                                            ],
                                           ),
+                                          const SizedBox(height: 3),
+                                          Text(
+                                            notif.message,
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              color: notif.isRead ? AppColors.textMuted : AppColors.textSecondary,
+                                              height: 1.3,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Column(
+                                      crossAxisAlignment: CrossAxisAlignment.end,
+                                      children: [
+                                        Text(
+                                          notif.createdAt != null
+                                              ? Formatters.time(notif.createdAt)
+                                              : 'Just now',
+                                          style: const TextStyle(
+                                            fontSize: 11,
+                                            color: AppColors.textMuted,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        IconButton(
+                                          icon: const Icon(Icons.close_rounded, size: 16, color: AppColors.textMuted),
+                                          padding: EdgeInsets.zero,
+                                          constraints: const BoxConstraints(),
+                                          tooltip: 'Delete notification',
+                                          onPressed: () => notificationProvider.deleteNotification(notif.id),
                                         ),
                                       ],
                                     ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    notif.createdAt != null
-                                        ? Formatters.time(notif.createdAt)
-                                        : 'Just now',
-                                    style: const TextStyle(
-                                      fontSize: 11,
-                                      color: AppColors.textMuted,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                ],
+                                  ],
+                                ),
                               ),
                             ),
                           );

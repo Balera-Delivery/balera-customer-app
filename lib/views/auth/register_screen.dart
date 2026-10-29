@@ -19,7 +19,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _formKey = GlobalKey<FormState>();
   final _fullNameController = TextEditingController();
   final _phoneController = TextEditingController();
-  final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
 
@@ -27,7 +26,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
   void dispose() {
     _fullNameController.dispose();
     _phoneController.dispose();
-    _emailController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     super.dispose();
@@ -37,11 +35,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
     if (!_formKey.currentState!.validate()) return;
 
     final authProvider = context.read<AuthProvider>();
-    final email = _emailController.text.trim();
     final success = await authProvider.register(
       fullName: _fullNameController.text.trim(),
       phoneNumber: _phoneController.text.trim(),
-      email: email.isNotEmpty ? email : null,
       password: _passwordController.text,
     );
 
@@ -131,21 +127,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 // Phone Number
                 CustomTextField(
                   label: 'Phone Number',
-                  hint: 'Enter your phone number',
+                  hint: 'Enter your phone number (e.g. 0912345678)',
                   controller: _phoneController,
                   keyboardType: TextInputType.phone,
                   validator: Validators.phone,
-                ),
-
-                const SizedBox(height: 16),
-
-                // Email
-                CustomTextField(
-                  label: 'Email',
-                  hint: 'Enter your email (e.g. name@example.com)',
-                  controller: _emailController,
-                  keyboardType: TextInputType.emailAddress,
-                  validator: Validators.email,
                 ),
 
                 const SizedBox(height: 16),

@@ -6,6 +6,7 @@ import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/widgets/custom_button.dart';
 import '../../core/widgets/mock_map_view.dart';
+import '../../core/widgets/real_google_map_view.dart';
 import '../../core/widgets/status_badge.dart';
 import '../../models/delivery_model.dart';
 import '../../providers/delivery_provider.dart';
@@ -696,12 +697,15 @@ class _DeliveryTrackingScreenState extends State<DeliveryTrackingScreen> {
                         width: double.infinity,
                         child: Stack(
                           children: [
-                            MockMapView(
+                            RealGoogleMapView(
                               pickupAddress: active.pickupLocation,
                               destinationAddress: active.destination,
-                              showRoute: true,
-                              showRider: currentStage >= 2 && currentStage < 5,
-                              height: 220,
+                              pickupLat: active.pickupLat,
+                              pickupLng: active.pickupLng,
+                              destinationLat: active.destinationLat,
+                              destinationLng: active.destinationLng,
+                              riderLat: active.rider?.currentLatitude,
+                              riderLng: active.rider?.currentLongitude,
                             ),
 
                             // Top Left Live ETA / Distance Badge

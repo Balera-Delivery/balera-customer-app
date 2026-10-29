@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/widgets/custom_button.dart';
@@ -26,12 +27,16 @@ class _CreateDeliveryScreenState extends State<CreateDeliveryScreen> {
   late TextEditingController _destinationController;
   final _itemDescriptionController = TextEditingController();
   final _instructionsController = TextEditingController();
+  final _foodSearchController = TextEditingController();
 
   double? _selectedPickupLat;
   double? _selectedPickupLng;
+  double? _selectedDestLat;
+  double? _selectedDestLng;
   double? _selectedFoodPrice;
   String? _selectedRestaurantName;
   String? _selectedRestaurantId;
+  bool _isLocating = false;
 
   @override
   void initState() {
@@ -67,7 +72,52 @@ class _CreateDeliveryScreenState extends State<CreateDeliveryScreen> {
     _destinationController.dispose();
     _itemDescriptionController.dispose();
     _instructionsController.dispose();
+    _foodSearchController.dispose();
     super.dispose();
+  }
+
+  Future<void> _useCurrentGpsForDestination() async {
+    setState(() => _isLocating = true);
+    try {
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      if (permission == LocationPermission.deniedForever || permission == LocationPermission.denied) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Location permission denied. Please type your destination.')),
+          );
+        }
+        return;
+      }
+
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
+      );
+      if (mounted) {
+        setState(() {
+          _selectedDestLat = position.latitude;
+          _selectedDestLng = position.longitude;
+          _destinationController.text =
+              'GPS Location (${position.latitude.toStringAsFixed(4)}, ${position.longitude.toStringAsFixed(4)})';
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Destination set from your current GPS location! 📍'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('GPS error: ${e.toString()}')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLocating = false);
+    }
   }
 
   void _syncFromRestaurantProvider(RestaurantProvider provider) {
@@ -204,7 +254,7 @@ class _CreateDeliveryScreenState extends State<CreateDeliveryScreen> {
     if (destination.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Please enter or select a destination.'),
+          content: Text('Destination is required! Please type destination address or tap "Use GPS".'),
           backgroundColor: AppColors.error,
         ),
       );
@@ -223,6 +273,8 @@ class _CreateDeliveryScreenState extends State<CreateDeliveryScreen> {
       restaurantId: _selectedRestaurantId,
       pickupLat: _selectedPickupLat ?? 7.0083,
       pickupLng: _selectedPickupLng ?? 39.9833,
+      destinationLat: _selectedDestLat ?? 7.0125,
+      destinationLng: _selectedDestLng ?? 39.9880,
     );
 
     Navigator.push(
@@ -278,15 +330,15 @@ class _CreateDeliveryScreenState extends State<CreateDeliveryScreen> {
               ),
               const SizedBox(height: 18),
 
-              // 1. Category Switcher ("Order Food" vs "Order Other")
+              // 1. Category Switcher ("Order from Partners" vs "Order Anything")
               Row(
                 children: [
-                  // Card 1: Order Food
+                  // Card 1: Order from Partners
                   Expanded(
                     child: _buildCategoryCard(
-                      title: 'Order Food',
+                      title: 'Order from Partners',
                       subtitle: 'Hotels & Menus',
-                      icon: Icons.restaurant_rounded,
+                      icon: Icons.storefront_rounded,
                       isSelected: isFood,
                       activeBgColor: const Color(0xFFEFF6FF),
                       activeBorderColor: AppColors.primary,
@@ -296,10 +348,10 @@ class _CreateDeliveryScreenState extends State<CreateDeliveryScreen> {
                   ),
                   const SizedBox(width: 12),
 
-                  // Card 2: Order Other
+                  // Card 2: Order Anything
                   Expanded(
                     child: _buildCategoryCard(
-                      title: 'Order Other',
+                      title: 'Order Anything',
                       subtitle: 'Parcels & custom items',
                       icon: Icons.inventory_2_rounded,
                       isSelected: isOther,
@@ -637,16 +689,76 @@ class _CreateDeliveryScreenState extends State<CreateDeliveryScreen> {
                     child: const CircularProgressIndicator(color: AppColors.primary),
                   ),
                 ] else if (selectedRestaurant.foods.isNotEmpty) ...[
+                  // Item Search Box (Requirement 8)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: TextField(
+                      controller: _foodSearchController,
+                      onChanged: (val) => setState(() {}),
+                      decoration: InputDecoration(
+                        hintText: 'Search items in ${selectedRestaurant.name}...',
+                        hintStyle: const TextStyle(fontSize: 12.5, color: AppColors.textMuted),
+                        prefixIcon: const Icon(Icons.search, size: 18, color: AppColors.textSecondary),
+                        suffixIcon: _foodSearchController.text.isNotEmpty
+                            ? IconButton(
+                                icon: const Icon(Icons.clear, size: 16),
+                                onPressed: () {
+                                  _foodSearchController.clear();
+                                  setState(() {});
+                                },
+                              )
+                            : null,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                        filled: true,
+                        fillColor: const Color(0xFFF8FAFC),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                        ),
+                      ),
+                    ),
+                  ),
+
                   // Food Dishes List for Selected Hotel
-                  SizedBox(
-                    height: 172,
-                    child: ListView.separated(
-                      scrollDirection: Axis.horizontal,
-                      itemCount: selectedRestaurant.foods.length,
-                      separatorBuilder: (_, __) => const SizedBox(width: 10),
-                      itemBuilder: (context, idx) {
-                        final food = selectedRestaurant.foods[idx];
-                        final isSelected = selectedFood?.id == food.id;
+                  Builder(
+                    builder: (context) {
+                      final query = _foodSearchController.text.trim().toLowerCase();
+                      final filteredFoods = selectedRestaurant.foods.where((f) {
+                        if (query.isEmpty) return true;
+                        return f.name.toLowerCase().contains(query) ||
+                            (f.description != null && f.description!.toLowerCase().contains(query));
+                      }).toList();
+
+                      if (filteredFoods.isEmpty) {
+                        return Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF8FAFC),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: const Color(0xFFE2E8F0)),
+                          ),
+                          child: Text(
+                            'No dishes match "$query" in this hotel.',
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(fontSize: 12.5, color: AppColors.textSecondary),
+                          ),
+                        );
+                      }
+
+                      return SizedBox(
+                        height: 172,
+                        child: ListView.separated(
+                          scrollDirection: Axis.horizontal,
+                          itemCount: filteredFoods.length,
+                          separatorBuilder: (_, __) => const SizedBox(width: 10),
+                          itemBuilder: (context, idx) {
+                            final food = filteredFoods[idx];
+                            final isSelected = selectedFood?.id == food.id;
 
                         return InkWell(
                           onTap: () => _onFoodItemSelected(food),
@@ -765,7 +877,9 @@ class _CreateDeliveryScreenState extends State<CreateDeliveryScreen> {
                         );
                       },
                     ),
-                  ),
+                  );
+                },
+              ),
 
                   // Quantity Selector for Selected Dish
                   if (selectedFood != null) ...[
@@ -827,109 +941,57 @@ class _CreateDeliveryScreenState extends State<CreateDeliveryScreen> {
                     ),
                   ],
                 ],
-
-                const SizedBox(height: 14),
-
-                // --- HELPFUL REMINDER BANNER FOR CUSTOM ORDERS ---
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFFFBEB),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xFFFDE68A)),
-                  ),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Icon(Icons.lightbulb_outline_rounded, color: Color(0xFFD97706), size: 18),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: RichText(
-                          text: TextSpan(
-                            style: const TextStyle(fontSize: 12, color: Color(0xFF92400E), height: 1.35),
-                            children: [
-                              const TextSpan(text: "Can't find your hotel or meal? "),
-                              const TextSpan(
-                                text: "Select the 'Order Other' option above ",
-                                style: TextStyle(fontWeight: FontWeight.w800),
-                              ),
-                              const TextSpan(
-                                text: "and write what you want—our rider will purchase and deliver it for you!",
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
               ],
 
               const SizedBox(height: 22),
 
-              // 2. "What do you want delivered?"
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    'What do you want delivered?',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                  if (isFood && selectedFood != null)
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF0FDF4),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: const Text(
-                        'Auto-filled from Menu',
-                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF16A34A)),
+              // Item Description (Shown only when ordering custom items from "Order Anything")
+              if (!(isFood && selectedRestaurant != null)) ...[
+                const SizedBox(height: 18),
+                const Row(
+                  children: [
+                    Text(
+                      'Item Description',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.textPrimary,
                       ),
                     ),
-                ],
-              ),
-              const SizedBox(height: 8),
-
-              TextField(
-                controller: _itemDescriptionController,
-                maxLines: isFood ? 2 : 1,
-                readOnly: isFood && selectedFood != null,
-                decoration: InputDecoration(
-                  hintText: isFood
-                      ? 'Selected hotel and food dish will appear here'
-                      : 'Describe your item (e.g. Documents, Laptop, Keys, Clothes, Special meal)',
-                  hintStyle: const TextStyle(fontSize: 13, color: AppColors.textMuted),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                  filled: isFood && selectedFood != null,
-                  fillColor: (isFood && selectedFood != null) ? const Color(0xFFF0F9FF) : Colors.white,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(
-                      color: (isFood && selectedFood != null) ? const Color(0xFFBAE6FD) : const Color(0xFFE2E8F0),
+                    SizedBox(width: 4),
+                    Text(
+                      '*',
+                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.error),
                     ),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(
-                      color: (isFood && selectedFood != null) ? const Color(0xFFBAE6FD) : const Color(0xFFE2E8F0),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                TextField(
+                  controller: _itemDescriptionController,
+                  maxLines: 2,
+                  decoration: InputDecoration(
+                    hintText: 'Describe your item (e.g. Documents, Laptop, Keys, Clothes, Special meal)',
+                    hintStyle: const TextStyle(fontSize: 13, color: AppColors.textMuted),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
                     ),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+                    ),
                   ),
                 ),
-              ),
+              ],
 
               const SizedBox(height: 18),
 
-              // 3. "Delivery Instructions (Optional)"
+              // Delivery Instructions (Optional)
               const Text(
                 'Delivery Instructions (Optional)',
                 style: TextStyle(
@@ -961,79 +1023,116 @@ class _CreateDeliveryScreenState extends State<CreateDeliveryScreen> {
                 ),
               ),
 
+              // Pickup Location (Requirement 2: REMOVED when customer picks a restaurant)
+              if (!(isFood && selectedRestaurant != null)) ...[
+                const SizedBox(height: 18),
+                const Row(
+                  children: [
+                    Text(
+                      'Pickup Location',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    SizedBox(width: 4),
+                    Text(
+                      '*',
+                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.error),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                TextField(
+                  controller: _pickupController,
+                  decoration: InputDecoration(
+                    hintText: 'Enter pickup address (or pick on map)',
+                    hintStyle: const TextStyle(fontSize: 13, color: AppColors.textMuted),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+                    ),
+                    suffixIcon: IconButton(
+                      icon: const Icon(Icons.map_outlined, color: AppColors.primary),
+                      tooltip: 'Pick on map',
+                      onPressed: _openPickupPicker,
+                    ),
+                  ),
+                ),
+              ],
+
               const SizedBox(height: 18),
 
-              // 4. "Pickup Location" (Auto-filled if hotel is chosen)
+              // Destination * (Requirement 1: Required, phone GPS or type manually)
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text(
-                    'Pickup Location',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.textPrimary,
-                    ),
+                  const Row(
+                    children: [
+                      Text(
+                        'Destination',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      SizedBox(width: 4),
+                      Text(
+                        '* (Required)',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.error,
+                        ),
+                      ),
+                    ],
                   ),
-                  if (isFood && selectedRestaurant != null)
-                    Container(
+                  InkWell(
+                    onTap: _isLocating ? null : _useCurrentGpsForDestination,
+                    borderRadius: BorderRadius.circular(6),
+                    child: Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFEFF6FF),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: const Text(
-                        'Hotel Address',
-                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.primary),
+                      child: Row(
+                        children: [
+                          if (_isLocating)
+                            const SizedBox(
+                              width: 12,
+                              height: 12,
+                              child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
+                            )
+                          else
+                            const Icon(Icons.my_location_rounded, size: 14, color: AppColors.primary),
+                          const SizedBox(width: 4),
+                          const Text(
+                            'Use GPS',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
+                  ),
                 ],
-              ),
-              const SizedBox(height: 6),
-              TextField(
-                controller: _pickupController,
-                decoration: InputDecoration(
-                  hintText: isFood
-                      ? (selectedRestaurant != null ? selectedRestaurant.address : 'Select a hotel above to auto-fill pickup')
-                      : 'Enter pickup address (or pick on map)',
-                  hintStyle: const TextStyle(fontSize: 13, color: AppColors.textMuted),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
-                  ),
-                  suffixIcon: IconButton(
-                    icon: const Icon(Icons.map_outlined, color: AppColors.primary),
-                    tooltip: 'Pick on map',
-                    onPressed: _openPickupPicker,
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 18),
-
-              // 5. "Destination"
-              const Text(
-                'Destination',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.textPrimary,
-                ),
               ),
               const SizedBox(height: 6),
               TextField(
                 controller: _destinationController,
                 decoration: InputDecoration(
-                  hintText: 'Enter destination address (or pick on map)',
+                  hintText: 'Enter destination address (or tap GPS)',
                   hintStyle: const TextStyle(fontSize: 13, color: AppColors.textMuted),
                   contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                   border: OutlineInputBorder(
@@ -1048,10 +1147,20 @@ class _CreateDeliveryScreenState extends State<CreateDeliveryScreen> {
                     borderRadius: BorderRadius.circular(12),
                     borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
                   ),
-                  suffixIcon: IconButton(
-                    icon: const Icon(Icons.map_outlined, color: AppColors.primary),
-                    tooltip: 'Pick on map',
-                    onPressed: _openDestinationPicker,
+                  suffixIcon: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.my_location_rounded, color: AppColors.primary),
+                        tooltip: 'Use current GPS location',
+                        onPressed: _useCurrentGpsForDestination,
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.map_outlined, color: AppColors.primary),
+                        tooltip: 'Pick on map',
+                        onPressed: _openDestinationPicker,
+                      ),
+                    ],
                   ),
                 ),
               ),

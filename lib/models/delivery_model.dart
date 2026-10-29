@@ -85,6 +85,7 @@ class DeliveryModel {
   final String? instructions;
   final String status;
   final String? otpCode;
+  final String? qrCodeToken;
   final String? cancellationReason;
   final DateTime? createdAt;
   final DateTime? updatedAt;
@@ -95,6 +96,11 @@ class DeliveryModel {
   final String? paymentMethod;
   final String? paymentStatus;
   final String? receiptUrl;
+
+  double? get pickupLatitude => pickupLat;
+  double? get pickupLongitude => pickupLng;
+  double? get destinationLatitude => destinationLat;
+  double? get destinationLongitude => destinationLng;
 
   DeliveryModel({
     required this.id,
@@ -111,6 +117,7 @@ class DeliveryModel {
     this.instructions,
     required this.status,
     this.otpCode,
+    this.qrCodeToken,
     this.cancellationReason,
     this.createdAt,
     this.updatedAt,
@@ -158,6 +165,7 @@ class DeliveryModel {
       instructions: data['specialInstructions'] as String? ?? data['instructions'] as String?,
       status: data['status'] as String? ?? 'PENDING',
       otpCode: otp,
+      qrCodeToken: data['qrCodeToken'] as String?,
       cancellationReason: data['cancellationReason'] as String?,
       createdAt: data['createdAt'] != null ? DateTime.tryParse(data['createdAt'].toString()) : null,
       updatedAt: data['updatedAt'] != null ? DateTime.tryParse(data['updatedAt'].toString()) : null,
@@ -188,6 +196,7 @@ class DeliveryModel {
       'instructions': instructions,
       'status': status,
       'otpCode': otpCode,
+      'qrCodeToken': qrCodeToken,
       'cancellationReason': cancellationReason,
       'createdAt': createdAt?.toIso8601String(),
       'updatedAt': updatedAt?.toIso8601String(),

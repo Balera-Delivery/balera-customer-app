@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/widgets/status_badge.dart';
@@ -296,12 +297,17 @@ class DeliveryDetailsScreen extends StatelessWidget {
                       ),
                       child: IconButton(
                         icon: const Icon(Icons.phone_outlined, color: AppColors.primary, size: 20),
-                        onPressed: () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('Calling ${delivery.rider!.fullName} (${delivery.rider!.phoneNumber})...'),
-                            ),
-                          );
+                        tooltip: 'Call rider',
+                        onPressed: () async {
+                          final cleanPhone = delivery.rider!.phoneNumber.replaceAll(RegExp(r'\s+'), '');
+                          final uri = Uri.parse('tel:$cleanPhone');
+                          try {
+                            await launchUrl(uri, mode: LaunchMode.externalApplication);
+                          } catch (_) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('Could not open phone dialer for $cleanPhone')),
+                            );
+                          }
                         },
                       ),
                     ),

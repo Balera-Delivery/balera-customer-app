@@ -137,13 +137,13 @@ class _LoginScreenState extends State<LoginScreen> {
 
                 const SizedBox(height: 36),
 
-                // Email or Phone Field
+                // Phone Number Field
                 CustomTextField(
-                  label: 'Email or Phone',
-                  hint: 'Enter your email or phone number',
+                  label: 'Phone Number',
+                  hint: 'Enter your phone number',
                   controller: _identifierController,
-                  keyboardType: TextInputType.emailAddress,
-                  validator: Validators.emailOrPhone,
+                  keyboardType: TextInputType.phone,
+                  validator: Validators.phone,
                 ),
 
                 const SizedBox(height: 20),

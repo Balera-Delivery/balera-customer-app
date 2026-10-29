@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/widgets/custom_button.dart';
-import '../../core/widgets/mock_map_view.dart';
+import '../../core/widgets/real_google_map_view.dart';
 import '../../providers/delivery_provider.dart';
 import '../../providers/location_provider.dart';
 
@@ -125,9 +125,15 @@ class _PickupLocationScreenState extends State<PickupLocationScreen> {
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                child: MockMapView(
+                child: RealGoogleMapView(
                   pickupAddress: _selectedAddress,
-                  showRoute: false,
+                  isPicker: true,
+                  onLocationPicked: (pos) {
+                    setState(() {
+                      _selectedAddress = 'Location (${pos.latitude.toStringAsFixed(5)}, ${pos.longitude.toStringAsFixed(5)})';
+                      _searchController.text = _selectedAddress;
+                    });
+                  },
                 ),
               ),
             ),

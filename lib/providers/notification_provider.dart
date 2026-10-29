@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../models/notification_model.dart';
 import '../services/notification_service.dart';
 
@@ -9,6 +10,7 @@ class NotificationProvider extends ChangeNotifier {
   List<NotificationModel> _notifications = [];
   bool _isLoading = false;
   String? _errorMessage;
+  int _lastKnownCount = 0;
 
   List<NotificationModel> get notifications => _notifications;
   bool get isLoading => _isLoading;
@@ -28,11 +30,19 @@ class NotificationProvider extends ChangeNotifier {
     final response = await _service.getNotifications(page: page, limit: limit);
 
     if (response.success && response.data != null) {
+      final newUnread = response.data!.where((n) => !n.isRead).length;
+      if (newUnread > 0 && response.data!.length > _lastKnownCount && _lastKnownCount > 0) {
+        // Play notification alert sound & vibration
+        try {
+          SystemSound.play(SystemSoundType.alert);
+          HapticFeedback.heavyImpact();
+        } catch (_) {}
+      }
       _notifications = response.data!;
+      _lastKnownCount = _notifications.length;
       _errorMessage = null;
     } else {
       _errorMessage = response.message.isNotEmpty ? response.message : 'Failed to load notifications.';
-      // Keep live notifications array clean without mock fallbacks
     }
 
     _isLoading = false;
@@ -52,5 +62,19 @@ class NotificationProvider extends ChangeNotifier {
     _notifications = _notifications.map((n) => n.copyWith(isRead: true)).toList();
     notifyListeners();
     await _service.markAllAsRead();
+  }
+
+  Future<void> deleteNotification(String id) async {
+    _notifications.removeWhere((n) => n.id == id);
+    _lastKnownCount = _notifications.length;
+    notifyListeners();
+    await _service.deleteNotification(id);
+  }
+
+  Future<void> clearAllNotifications() async {
+    _notifications.clear();
+    _lastKnownCount = 0;
+    notifyListeners();
+    await _service.clearAllNotifications();
   }
 }

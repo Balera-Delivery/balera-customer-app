@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/widgets/custom_button.dart';
 import '../../core/widgets/mock_map_view.dart';
+import '../../core/widgets/real_google_map_view.dart';
 import '../../models/delivery_model.dart';
 import '../../providers/delivery_provider.dart';
 import 'delivery_details_screen.dart';
@@ -77,11 +79,15 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
         children: [
           // Full Interactive Map Area (Screen 12)
           Positioned.fill(
-            child: MockMapView(
+            child: RealGoogleMapView(
               pickupAddress: tracking?.pickupAddress.isNotEmpty == true ? tracking!.pickupAddress : delivery?.pickupLocation,
               destinationAddress: tracking?.destinationAddress.isNotEmpty == true ? tracking!.destinationAddress : delivery?.destination,
-              showRoute: true,
-              showRider: true,
+              pickupLat: delivery?.pickupLat,
+              pickupLng: delivery?.pickupLng,
+              destinationLat: delivery?.destinationLat,
+              destinationLng: delivery?.destinationLng,
+              riderLat: rider?.currentLatitude,
+              riderLng: rider?.currentLongitude,
             ),
           ),
 
@@ -295,11 +301,18 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
             ListTile(
               leading: const CircleAvatar(backgroundColor: Color(0xFFEFF6FF), child: Icon(Icons.phone, color: AppColors.primary)),
               title: Text('Call $riderPhone'),
-              onTap: () {
+              subtitle: const Text('Open phone dialer', style: TextStyle(fontSize: 11, color: AppColors.textMuted)),
+              onTap: () async {
                 Navigator.pop(ctx);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Calling $riderName ($riderPhone)...')),
-                );
+                final cleanPhone = riderPhone.replaceAll(RegExp(r'\s+'), '');
+                final uri = Uri.parse('tel:$cleanPhone');
+                try {
+                  await launchUrl(uri, mode: LaunchMode.externalApplication);
+                } catch (_) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Could not open phone dialer for $cleanPhone')),
+                  );
+                }
               },
             ),
             ListTile(

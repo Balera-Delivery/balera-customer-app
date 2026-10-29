@@ -62,4 +62,28 @@ class NotificationService {
       return ApiResponse.error(e.toString());
     }
   }
+
+  // Delete Single Notification (DELETE /api/v1/notifications/{id})
+  Future<ApiResponse<void>> deleteNotification(String notificationId) async {
+    try {
+      final response = await _client.dio.delete('${ApiEndpoints.notifications}/$notificationId');
+      return ApiResponse.fromJson(response.data as Map<String, dynamic>, null);
+    } on DioException catch (e) {
+      return ApiResponse.error(ApiClient.handleDioError(e));
+    } catch (e) {
+      return ApiResponse.error(e.toString());
+    }
+  }
+
+  // Clear All Notifications (DELETE /api/v1/notifications)
+  Future<ApiResponse<void>> clearAllNotifications() async {
+    try {
+      final response = await _client.dio.delete(ApiEndpoints.notifications);
+      return ApiResponse.fromJson(response.data as Map<String, dynamic>, null);
+    } on DioException catch (e) {
+      return ApiResponse.error(ApiClient.handleDioError(e));
+    } catch (e) {
+      return ApiResponse.error(e.toString());
+    }
+  }
 }
