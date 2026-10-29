@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/widgets/custom_button.dart';
-import '../../core/widgets/mock_map_view.dart';
 import '../../core/widgets/real_google_map_view.dart';
 import '../../models/delivery_model.dart';
 import '../../providers/delivery_provider.dart';
@@ -201,9 +200,15 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text(
-                              'Handover OTP Code',
-                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF166534)),
+                            const Row(
+                              children: [
+                                Icon(Icons.qr_code_2_rounded, size: 14, color: Color(0xFF166534)),
+                                SizedBox(width: 4),
+                                Text(
+                                  'QR & OTP Code',
+                                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF166534)),
+                                ),
+                              ],
                             ),
                             const SizedBox(height: 2),
                             Text(
@@ -212,11 +217,12 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
                             ),
                           ],
                         ),
-                        ElevatedButton(
+                        ElevatedButton.icon(
+                          icon: const Icon(Icons.qr_code_scanner_rounded, size: 16, color: Colors.white),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppColors.success,
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                           ),
                           onPressed: () {
                             Navigator.push(
@@ -225,11 +231,12 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
                                 builder: (_) => DeliveryOtpScreen(
                                   deliveryId: delivery?.trackingCode ?? delivery?.id ?? 'DLV-00126',
                                   otpCode: delivery?.otpCode,
+                                  qrCodeToken: delivery?.qrCodeToken,
                                 ),
                               ),
                             );
                           },
-                          child: const Text('Give OTP', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700)),
+                          label: const Text('Show QR & OTP', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700)),
                         ),
                       ],
                     ),

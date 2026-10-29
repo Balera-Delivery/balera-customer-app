@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/widgets/balera_logo.dart';
@@ -490,7 +492,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // 2. Rider Arrived & Delivery OTP Box (If rider is active & arrived)
+                    // 2. Rider Arrived & Delivery QR/OTP Box (If rider is active & en-route/arrived)
                     if (isArrived) ...[
                       Container(
                         width: double.infinity,
@@ -512,14 +514,16 @@ class _HomeScreenState extends State<HomeScreen> {
                           children: [
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: const [
+                              children: [
                                 Row(
                                   children: [
-                                    Icon(Icons.directions_bike_rounded, color: AppColors.success, size: 20),
-                                    SizedBox(width: 8),
+                                    const Icon(Icons.directions_bike_rounded, color: AppColors.success, size: 20),
+                                    const SizedBox(width: 8),
                                     Text(
-                                      'Rider Has Arrived!',
-                                      style: TextStyle(
+                                      activeDelivery.status == AppConstants.statusOnTheWay
+                                          ? 'Driver En Route!'
+                                          : 'Rider Has Arrived!',
+                                      style: const TextStyle(
                                         fontWeight: FontWeight.w800,
                                         fontSize: 15,
                                         color: Color(0xFF15803D),
@@ -527,60 +531,138 @@ class _HomeScreenState extends State<HomeScreen> {
                                     ),
                                   ],
                                 ),
-                                Text(
-                                  'Active',
-                                  style: TextStyle(
-                                    color: Color(0xFF15803D),
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 12,
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFDCFCE7),
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(color: const Color(0xFF86EFAC)),
+                                  ),
+                                  child: const Text(
+                                    'QR & OTP Ready',
+                                    style: TextStyle(
+                                      color: Color(0xFF15803D),
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 11,
+                                    ),
                                   ),
                                 ),
                               ],
                             ),
                             const SizedBox(height: 8),
                             const Text(
-                              'Give this 6-digit OTP code to the rider to confirm handover:',
+                              'Show this QR code to the rider to scan, or provide the 6-digit OTP code below:',
                               style: TextStyle(fontSize: 12, color: Color(0xFF166534), height: 1.3),
                             ),
                             const SizedBox(height: 12),
+
+                            // Dual QR Code & OTP Handover Box
                             Container(
                               width: double.infinity,
-                              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                              padding: const EdgeInsets.all(14),
                               decoration: BoxDecoration(
                                 color: Colors.white,
-                                borderRadius: BorderRadius.circular(12),
+                                borderRadius: BorderRadius.circular(14),
                                 border: Border.all(color: const Color(0xFFBBF7D0)),
                               ),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              child: Column(
                                 children: [
-                                  Text(
-                                    activeDelivery.otpCode ?? '482913',
-                                    style: const TextStyle(
-                                      fontSize: 24,
-                                      fontWeight: FontWeight.w900,
-                                      letterSpacing: 5,
-                                      color: AppColors.primary,
+                                  // Prominent QR Code
+                                  Container(
+                                    padding: const EdgeInsets.all(8),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      borderRadius: BorderRadius.circular(10),
+                                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                                    ),
+                                    child: QrImageView(
+                                      data: activeDelivery.qrCodeToken ??
+                                          'BALERA-${activeDelivery.trackingCode ?? activeDelivery.id}-${activeDelivery.otpCode ?? "482913"}',
+                                      version: QrVersions.auto,
+                                      size: 140.0,
+                                      eyeStyle: const QrEyeStyle(
+                                        eyeShape: QrEyeShape.square,
+                                        color: AppColors.primary,
+                                      ),
+                                      dataModuleStyle: const QrDataModuleStyle(
+                                        dataModuleShape: QrDataModuleShape.square,
+                                        color: Color(0xFF0F172A),
+                                      ),
                                     ),
                                   ),
-                                  ElevatedButton(
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: AppColors.success,
-                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                  const SizedBox(height: 6),
+                                  const Text(
+                                    'Scan QR Code to Confirm Delivery',
+                                    style: TextStyle(
+                                      fontSize: 11.5,
+                                      fontWeight: FontWeight.w700,
+                                      color: Color(0xFF15803D),
                                     ),
-                                    onPressed: () {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (_) => DeliveryOtpScreen(
-                                            deliveryId: activeDelivery.trackingCode ?? activeDelivery.id,
-                                            otpCode: activeDelivery.otpCode,
+                                  ),
+                                  const Divider(height: 18, color: Color(0xFFE2E8F0)),
+
+                                  // 6-Digit OTP Section
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          const Text(
+                                            '6-Digit OTP Code:',
+                                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.textMuted),
                                           ),
-                                        ),
-                                      );
-                                    },
-                                    child: const Text('View & Complete', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700)),
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            activeDelivery.otpCode ?? '482913',
+                                            style: const TextStyle(
+                                              fontSize: 22,
+                                              fontWeight: FontWeight.w900,
+                                              letterSpacing: 4,
+                                              color: AppColors.primary,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      Row(
+                                        children: [
+                                          IconButton(
+                                            tooltip: 'Copy OTP',
+                                            icon: const Icon(Icons.copy_rounded, color: AppColors.primary, size: 20),
+                                            onPressed: () {
+                                              Clipboard.setData(ClipboardData(text: activeDelivery.otpCode ?? '482913'));
+                                              ScaffoldMessenger.of(context).showSnackBar(
+                                                const SnackBar(
+                                                  content: Text('OTP copied to clipboard!'),
+                                                  backgroundColor: AppColors.success,
+                                                  duration: Duration(seconds: 2),
+                                                ),
+                                              );
+                                            },
+                                          ),
+                                          ElevatedButton(
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: AppColors.primary,
+                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                            ),
+                                            onPressed: () {
+                                              Navigator.push(
+                                                context,
+                                                MaterialPageRoute(
+                                                  builder: (_) => DeliveryOtpScreen(
+                                                    deliveryId: activeDelivery.trackingCode ?? activeDelivery.id,
+                                                    otpCode: activeDelivery.otpCode,
+                                                    qrCodeToken: activeDelivery.qrCodeToken,
+                                                  ),
+                                                ),
+                                              );
+                                            },
+                                            child: const Text('Full View', style: TextStyle(color: Colors.white, fontSize: 11.5, fontWeight: FontWeight.w700)),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
                                   ),
                                 ],
                               ),

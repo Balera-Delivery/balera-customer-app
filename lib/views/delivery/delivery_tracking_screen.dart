@@ -2,15 +2,16 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/widgets/custom_button.dart';
-import '../../core/widgets/mock_map_view.dart';
 import '../../core/widgets/real_google_map_view.dart';
 import '../../core/widgets/status_badge.dart';
 import '../../models/delivery_model.dart';
 import '../../providers/delivery_provider.dart';
 import 'delivery_completed_screen.dart';
+import 'delivery_otp_screen.dart';
 import 'live_tracking_screen.dart';
 
 class DeliveryTrackingScreen extends StatefulWidget {
@@ -243,6 +244,7 @@ class _DeliveryTrackingScreenState extends State<DeliveryTrackingScreen> {
         return 4;
       case 'DELIVERED':
       case 'ARRIVED':
+      case 'ARRIVED_AT_DROPOFF':
         return 5;
       case 'COMPLETED':
         return 6;
@@ -273,8 +275,12 @@ class _DeliveryTrackingScreenState extends State<DeliveryTrackingScreen> {
     }
 
     final currentStage = _getStageIndex(active.status);
-    final isArrived = currentStage == 5 || active.status == "DELIVERED" || active.status == "ARRIVED";
+    final isArrived = currentStage == 5 ||
+        active.status == "DELIVERED" ||
+        active.status == "ARRIVED" ||
+        active.status == "ARRIVED_AT_DROPOFF";
     final isCompleted = currentStage == 6 || active.status.toUpperCase() == "COMPLETED";
+    final isEnRouteOrArrived = (currentStage >= 4 || isArrived) && !isCompleted;
     if (isCompleted) {
       _checkAndShowCompletionDialog(active.status);
     }
@@ -376,91 +382,232 @@ class _DeliveryTrackingScreenState extends State<DeliveryTrackingScreen> {
 
               const SizedBox(height: 16),
 
-              // MAIN ACTION & ARRIVAL OTP CARD (When Rider Arrives or Active Handover)
-              if (isArrived) ...[
+              // MAIN ACTION & ARRIVAL HANDOVER CARD (Dual QR Code & OTP Verification)
+              if (isEnRouteOrArrived) ...[
                 Container(
                   width: double.infinity,
-                  padding: const EdgeInsets.all(18),
+                  padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
                     color: const Color(0xFFF0FDF4),
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(20),
                     border: Border.all(color: const Color(0xFF86EFAC), width: 2),
                     boxShadow: [
                       BoxShadow(
                         color: Colors.green.withValues(alpha: 0.1),
-                        blurRadius: 10,
+                        blurRadius: 12,
                         offset: const Offset(0, 4),
                       ),
                     ],
                   ),
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
                       Row(
-                        children: const [
-                          Icon(Icons.check_circle_rounded, color: AppColors.success, size: 24),
-                          SizedBox(width: 8),
-                          Text(
-                            'Rider Has Arrived!',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w800,
-                              color: Color(0xFF15803D),
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(
+                                isArrived ? Icons.check_circle_rounded : Icons.directions_bike_rounded,
+                                color: AppColors.success,
+                                size: 24,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                isArrived ? 'Rider Has Arrived!' : 'Handover Pass Ready',
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w800,
+                                  color: Color(0xFF15803D),
+                                ),
+                              ),
+                            ],
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFDCFCE7),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(color: const Color(0xFF86EFAC)),
+                            ),
+                            child: const Text(
+                              'Dual Verification',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFF15803D),
+                              ),
                             ),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 6),
+                      const SizedBox(height: 10),
                       const Text(
-                        'Please give this 6-digit OTP code to the rider to confirm handover:',
-                        style: TextStyle(fontSize: 13, color: Color(0xFF166534), height: 1.3),
+                        'Ask the rider to scan this QR code with their camera, or provide the 6-digit OTP code below to confirm handover:',
+                        textAlign: TextAlign.start,
+                        style: TextStyle(fontSize: 13, color: Color(0xFF166534), height: 1.35),
                       ),
-                      const SizedBox(height: 14),
+                      const SizedBox(height: 18),
 
-                      // Giant OTP Display Box
+                      // 1. PRIMARY: Prominent QR Code Display Container
                       Container(
                         width: double.infinity,
-                        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+                        padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 16),
                         decoration: BoxDecoration(
                           color: Colors.white,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: const Color(0xFFBBF7D0)),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: const Color(0xFFBBF7D0), width: 1.5),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.04),
+                              blurRadius: 8,
+                              offset: const Offset(0, 3),
+                            ),
+                          ],
                         ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        child: Column(
                           children: [
-                            Text(
-                              active.otpCode ?? '482913',
-                              style: const TextStyle(
-                                fontSize: 28,
-                                fontWeight: FontWeight.w900,
-                                letterSpacing: 6,
-                                color: AppColors.primary,
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: const [
+                                Icon(Icons.qr_code_scanner_rounded, size: 20, color: AppColors.primary),
+                                SizedBox(width: 8),
+                                Text(
+                                  'Primary: Have Rider Scan QR Code',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w800,
+                                    color: AppColors.primary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 14),
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: const Color(0xFFE2E8F0)),
+                              ),
+                              child: QrImageView(
+                                data: active.qrCodeToken ?? 'BALERA-$displayCode-${active.otpCode ?? "482913"}',
+                                version: QrVersions.auto,
+                                size: 185.0,
+                                eyeStyle: const QrEyeStyle(
+                                  eyeShape: QrEyeShape.square,
+                                  color: AppColors.primary,
+                                ),
+                                dataModuleStyle: const QrDataModuleStyle(
+                                  dataModuleShape: QrDataModuleShape.square,
+                                  color: Color(0xFF0F172A),
+                                ),
                               ),
                             ),
-                            IconButton(
-                              tooltip: 'Copy OTP',
-                              icon: const Icon(Icons.copy_rounded, color: AppColors.primary, size: 22),
-                              onPressed: () {
-                                Clipboard.setData(ClipboardData(text: active.otpCode ?? '482913'));
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('OTP copied to clipboard!'),
-                                    backgroundColor: AppColors.success,
-                                    duration: Duration(seconds: 2),
-                                  ),
-                                );
-                              },
+                            const SizedBox(height: 10),
+                            Text(
+                              'Token: ${active.qrCodeToken ?? "BALERA-$displayCode"}',
+                              style: const TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.textMuted,
+                                letterSpacing: 0.5,
+                              ),
                             ),
                           ],
                         ),
                       ),
 
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 14),
+
+                      // 2. SECONDARY: 6-Digit OTP Box
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: const Color(0xFFBBF7D0)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Row(
+                              children: [
+                                Icon(Icons.pin_outlined, size: 16, color: Color(0xFF166534)),
+                                SizedBox(width: 6),
+                                Text(
+                                  'Alternative: 6-Digit OTP Code',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                    color: Color(0xFF166534),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  active.otpCode ?? '482913',
+                                  style: const TextStyle(
+                                    fontSize: 28,
+                                    fontWeight: FontWeight.w900,
+                                    letterSpacing: 6,
+                                    color: AppColors.primary,
+                                  ),
+                                ),
+                                Row(
+                                  children: [
+                                    IconButton(
+                                      tooltip: 'Copy OTP',
+                                      icon: const Icon(Icons.copy_rounded, color: AppColors.primary, size: 22),
+                                      onPressed: () {
+                                        Clipboard.setData(ClipboardData(text: active.otpCode ?? '482913'));
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          const SnackBar(
+                                            content: Text('OTP copied to clipboard!'),
+                                            backgroundColor: AppColors.success,
+                                            duration: Duration(seconds: 2),
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                    TextButton.icon(
+                                      icon: const Icon(Icons.fullscreen_rounded, size: 18),
+                                      label: const Text('Full View'),
+                                      style: TextButton.styleFrom(
+                                        foregroundColor: AppColors.primary,
+                                        visualDensity: VisualDensity.compact,
+                                      ),
+                                      onPressed: () {
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (_) => DeliveryOtpScreen(
+                                              deliveryId: displayCode,
+                                              otpCode: active.otpCode,
+                                              qrCodeToken: active.qrCodeToken,
+                                            ),
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      const SizedBox(height: 18),
 
                       // THE MAIN ACTION BUTTON
                       CustomButton(
-                        text: 'I Gave OTP to Rider - Complete',
+                        text: 'I Gave OTP or Rider Scanned - Complete',
                         onPressed: () async {
                           provider.updateActiveStatus(AppConstants.statusCompleted);
                           await provider.fetchDeliveries();
@@ -588,8 +735,8 @@ class _DeliveryTrackingScreenState extends State<DeliveryTrackingScreen> {
                       stepNumber: 5,
                       title: 'Rider Arrived at Destination',
                       subtitle: isArrived
-                          ? 'Rider has arrived outside! Share your 6-digit OTP code.'
-                          : 'Rider arrives and requests your verification OTP.',
+                          ? 'Rider has arrived outside! Show your QR code or share your 6-digit OTP.'
+                          : 'Rider arrives and requests your QR scan or verification OTP.',
                       isCompleted: currentStage >= 6,
                       isActive: currentStage == 4 || currentStage == 5,
                       highlightGreen: isArrived,
@@ -598,8 +745,8 @@ class _DeliveryTrackingScreenState extends State<DeliveryTrackingScreen> {
                       stepNumber: 6,
                       title: 'Delivered & Completed',
                       subtitle: isCompleted
-                          ? 'Package safely delivered and verified via OTP! 🎉'
-                          : 'Final handover upon OTP confirmation.',
+                          ? 'Package safely delivered and verified via QR / OTP! 🎉'
+                          : 'Final handover upon QR scan or OTP confirmation.',
                       isCompleted: isCompleted,
                       isActive: false,
                       isLast: true,
