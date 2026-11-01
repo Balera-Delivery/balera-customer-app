@@ -3,6 +3,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/widgets/custom_button.dart';
+import '../../core/widgets/partner_cover_image.dart';
 import '../../models/food_item_model.dart';
 import '../../models/restaurant_model.dart';
 import '../../providers/delivery_provider.dart';
@@ -546,100 +547,114 @@ class _CreateDeliveryScreenState extends State<CreateDeliveryScreen> {
                   // State B: When a hotel is selected
                   InkWell(
                     onTap: () => _openRestaurantPicker(context),
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(18),
                     child: Container(
                       width: double.infinity,
-                      padding: const EdgeInsets.all(14),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFF0F9FF),
-                        borderRadius: BorderRadius.circular(16),
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(18),
                         border: Border.all(color: const Color(0xFFBAE6FD), width: 1.2),
                         boxShadow: [
                           BoxShadow(
-                            color: const Color(0xFF0284C7).withValues(alpha: 0.06),
-                            blurRadius: 10,
-                            offset: const Offset(0, 3),
+                            color: const Color(0xFF0284C7).withValues(alpha: 0.08),
+                            blurRadius: 12,
+                            offset: const Offset(0, 4),
                           ),
                         ],
                       ),
-                      child: Row(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // Hotel Avatar
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(12),
-                            child: Container(
-                              width: 54,
-                              height: 54,
-                              color: const Color(0xFFE0F2FE),
-                              child: selectedRestaurant.avatar != null && selectedRestaurant.avatar!.isNotEmpty
-                                  ? Image.network(
-                                      selectedRestaurant.avatar!,
-                                      fit: BoxFit.cover,
-                                      errorBuilder: (_, __, ___) => const Icon(Icons.restaurant_rounded, color: AppColors.primary, size: 26),
-                                    )
-                                  : const Icon(Icons.restaurant_rounded, color: AppColors.primary, size: 26),
-                            ),
+                          // Partner Cover Image Banner (Matching Admin Cover)
+                          PartnerCoverImage(
+                            bannerUrl: selectedRestaurant.banner,
+                            height: 90,
+                            borderRadius: const BorderRadius.vertical(top: Radius.circular(17)),
                           ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+
+                          // Partner details row
+                          Padding(
+                            padding: const EdgeInsets.all(14),
+                            child: Row(
                               children: [
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: Text(
-                                        selectedRestaurant.name,
-                                        style: const TextStyle(
-                                          fontSize: 14.5,
-                                          fontWeight: FontWeight.w800,
-                                          color: AppColors.textPrimary,
-                                        ),
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: Container(
+                                    width: 46,
+                                    height: 46,
+                                    color: const Color(0xFFE0F2FE),
+                                    child: selectedRestaurant.avatar != null && selectedRestaurant.avatar!.isNotEmpty
+                                        ? Image.network(
+                                            selectedRestaurant.avatar!,
+                                            fit: BoxFit.cover,
+                                            errorBuilder: (_, __, ___) => const Icon(Icons.restaurant_rounded, color: AppColors.primary, size: 24),
+                                          )
+                                        : const Icon(Icons.restaurant_rounded, color: AppColors.primary, size: 24),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Expanded(
+                                            child: Text(
+                                              selectedRestaurant.name,
+                                              style: const TextStyle(
+                                                fontSize: 14.5,
+                                                fontWeight: FontWeight.w800,
+                                                color: AppColors.textPrimary,
+                                              ),
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFFE0F2FE),
+                                              borderRadius: BorderRadius.circular(6),
+                                            ),
+                                            child: const Text(
+                                              'Verified Partner',
+                                              style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: AppColors.primary),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 3),
+                                      Text(
+                                        selectedRestaurant.address,
+                                        style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                                        maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
                                       ),
-                                    ),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFFE0F2FE),
-                                        borderRadius: BorderRadius.circular(6),
+                                      const SizedBox(height: 4),
+                                      Row(
+                                        children: [
+                                          const Icon(Icons.access_time_rounded, size: 13, color: AppColors.textSecondary),
+                                          const SizedBox(width: 3),
+                                          Text(
+                                            selectedRestaurant.deliveryTime,
+                                            style: const TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
+                                          ),
+                                          const SizedBox(width: 10),
+                                          const Icon(Icons.menu_book_rounded, size: 13, color: AppColors.textSecondary),
+                                          const SizedBox(width: 3),
+                                          Text(
+                                            '${selectedRestaurant.foods.length} items',
+                                            style: const TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
+                                          ),
+                                        ],
                                       ),
-                                      child: const Text(
-                                        'Verified',
-                                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: AppColors.primary),
-                                      ),
-                                    ),
-                                  ],
+                                    ],
+                                  ),
                                 ),
-                                const SizedBox(height: 3),
-                                Text(
-                                  selectedRestaurant.address,
-                                  style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                const SizedBox(height: 4),
-                                Row(
-                                  children: [
-                                    const Icon(Icons.star_rounded, size: 14, color: Color(0xFFEAB308)),
-                                    const SizedBox(width: 3),
-                                    Text(
-                                      '${selectedRestaurant.rating}',
-                                      style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
-                                    ),
-                                    const SizedBox(width: 10),
-                                    const Icon(Icons.access_time_rounded, size: 13, color: AppColors.textSecondary),
-                                    const SizedBox(width: 3),
-                                    Text(
-                                      selectedRestaurant.deliveryTime,
-                                      style: const TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
-                                    ),
-                                  ],
-                                ),
+                                const Icon(Icons.chevron_right_rounded, color: AppColors.primary, size: 20),
                               ],
                             ),
                           ),
-                          const Icon(Icons.chevron_right_rounded, color: AppColors.primary, size: 20),
                         ],
                       ),
                     ),
@@ -1411,7 +1426,6 @@ class _RestaurantPickerSheetState extends State<_RestaurantPickerSheet> {
                         onTap: () => widget.onSelected(item),
                         borderRadius: BorderRadius.circular(16),
                         child: Container(
-                          padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
                             color: isCurrent ? const Color(0xFFF0F9FF) : Colors.white,
                             borderRadius: BorderRadius.circular(16),
@@ -1427,67 +1441,82 @@ class _RestaurantPickerSheetState extends State<_RestaurantPickerSheet> {
                               ),
                             ],
                           ),
-                          child: Row(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              ClipRRect(
-                                borderRadius: BorderRadius.circular(12),
-                                child: Container(
-                                  width: 60,
-                                  height: 60,
-                                  color: const Color(0xFFE0F2FE),
-                                  child: item.avatar != null && item.avatar!.isNotEmpty
-                                      ? Image.network(
-                                          item.avatar!,
-                                          fit: BoxFit.cover,
-                                          errorBuilder: (_, __, ___) => const Icon(Icons.restaurant_rounded, color: AppColors.primary, size: 28),
-                                        )
-                                      : const Icon(Icons.restaurant_rounded, color: AppColors.primary, size: 28),
-                                ),
+                              // Partner Cover Image Banner (Matching Admin Cover)
+                              PartnerCoverImage(
+                                bannerUrl: item.banner,
+                                height: 74,
+                                borderRadius: const BorderRadius.vertical(top: Radius.circular(15)),
                               ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
+
+                              Padding(
+                                padding: const EdgeInsets.all(12),
+                                child: Row(
                                   children: [
-                                    Row(
-                                      children: [
-                                        Expanded(
-                                          child: Text(
-                                            item.name,
-                                            style: const TextStyle(
-                                              fontSize: 14.5,
-                                              fontWeight: FontWeight.w800,
-                                              color: AppColors.textPrimary,
-                                            ),
-                                          ),
-                                        ),
-                                        if (isCurrent)
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                            decoration: BoxDecoration(
-                                              color: AppColors.primary,
-                                              borderRadius: BorderRadius.circular(6),
-                                            ),
-                                            child: const Text('Selected', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white)),
-                                          ),
-                                      ],
+                                    ClipRRect(
+                                      borderRadius: BorderRadius.circular(10),
+                                      child: Container(
+                                        width: 44,
+                                        height: 44,
+                                        color: const Color(0xFFE0F2FE),
+                                        child: item.avatar != null && item.avatar!.isNotEmpty
+                                            ? Image.network(
+                                                item.avatar!,
+                                                fit: BoxFit.cover,
+                                                errorBuilder: (_, __, ___) => const Icon(Icons.restaurant_rounded, color: AppColors.primary, size: 22),
+                                              )
+                                            : const Icon(Icons.restaurant_rounded, color: AppColors.primary, size: 22),
+                                      ),
                                     ),
-                                    const SizedBox(height: 3),
-                                    Text(
-                                      item.address,
-                                      style: const TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Row(
-                                      children: [
-                                        const Icon(Icons.star_rounded, size: 14, color: Color(0xFFEAB308)),
-                                        const SizedBox(width: 3),
-                                        Text('${item.rating}', style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700)),
-                                        const SizedBox(width: 8),
-                                        Text('• ${item.foods.length} dishes in menu', style: const TextStyle(fontSize: 11, color: AppColors.textMuted)),
-                                      ],
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Row(
+                                            children: [
+                                              Expanded(
+                                                child: Text(
+                                                  item.name,
+                                                  style: const TextStyle(
+                                                    fontSize: 14.5,
+                                                    fontWeight: FontWeight.w800,
+                                                    color: AppColors.textPrimary,
+                                                  ),
+                                                ),
+                                              ),
+                                              if (isCurrent)
+                                                Container(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                  decoration: BoxDecoration(
+                                                    color: AppColors.primary,
+                                                    borderRadius: BorderRadius.circular(6),
+                                                  ),
+                                                  child: const Text('Selected', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white)),
+                                                ),
+                                            ],
+                                          ),
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            item.address,
+                                            style: const TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                          const SizedBox(height: 3),
+                                          Row(
+                                            children: [
+                                              const Icon(Icons.access_time_rounded, size: 12, color: AppColors.textMuted),
+                                              const SizedBox(width: 3),
+                                              Text(item.deliveryTime, style: const TextStyle(fontSize: 11, color: AppColors.textMuted)),
+                                              const SizedBox(width: 8),
+                                              Text('• ${item.foods.length} dishes in menu', style: const TextStyle(fontSize: 11, color: AppColors.textMuted)),
+                                            ],
+                                          ),
+                                        ],
+                                      ),
                                     ),
                                   ],
                                 ),
