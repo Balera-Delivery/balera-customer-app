@@ -205,6 +205,113 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Widget _buildPromoBannerCard(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 20),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [
+            Color(0xFF0F172A),
+            Color(0xFF1E293B),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.10),
+            blurRadius: 14,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(20),
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const CreateDeliveryScreen()),
+            );
+          },
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1E3A8A),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFF3B82F6).withValues(alpha: 0.3)),
+                  ),
+                  child: const Icon(
+                    Icons.local_offer_rounded,
+                    color: Color(0xFF60A5FA),
+                    size: 22,
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF2563EB),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: const Text(
+                              'SPECIAL PROMO',
+                              style: TextStyle(
+                                fontSize: 9.5,
+                                fontWeight: FontWeight.w800,
+                                color: Colors.white,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          const Text(
+                            'Save on Orders',
+                            style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8), fontWeight: FontWeight.w600),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      const Text(
+                        'Apply promo codes at checkout for instant discounts & free delivery!',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                          height: 1.25,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                const Icon(
+                  Icons.arrow_forward_ios_rounded,
+                  color: Color(0xFF94A3B8),
+                  size: 14,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final authProvider = context.watch<AuthProvider>();
@@ -499,6 +606,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // Special Promotional Banner
+                    _buildPromoBannerCard(context),
+
                     // 2. Rider Arrived & Delivery QR/OTP Box (If rider is active & en-route/arrived)
                     if (isArrived) ...[
                       Container(

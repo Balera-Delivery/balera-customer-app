@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/widgets/custom_button.dart';
 import '../../providers/delivery_provider.dart';
+import '../../services/promotion_service.dart';
 import 'request_submitted_screen.dart';
 
 enum PaymentMethod { telebirr, cbe, awash }
@@ -67,6 +68,14 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   final ScrollController _scrollController = ScrollController();
   final GlobalKey _receiptSectionKey = GlobalKey();
 
+  // Promotions
+  final TextEditingController _promoController = TextEditingController();
+  final PromotionService _promotionService = PromotionService();
+  bool _isValidatingPromo = false;
+  String? _appliedPromoCode;
+  double _appliedDiscount = 0.0;
+  String? _promoErrorMessage;
+
   final List<PaymentAccountInfo> _paymentAccounts = const [
     PaymentAccountInfo(
       method: PaymentMethod.telebirr,
@@ -102,8 +111,57 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   @override
   void dispose() {
+    _promoController.dispose();
     _scrollController.dispose();
     super.dispose();
+  }
+
+  Future<void> _applyPromoCode(double orderSubtotal, double deliveryFee) async {
+    final code = _promoController.text.trim().toUpperCase();
+    if (code.isEmpty) return;
+
+    setState(() {
+      _isValidatingPromo = true;
+      _promoErrorMessage = null;
+    });
+
+    final result = await _promotionService.validatePromo(
+      code: code,
+      orderAmount: orderSubtotal,
+      deliveryFee: deliveryFee,
+    );
+
+    if (!mounted) return;
+
+    setState(() {
+      _isValidatingPromo = false;
+      if (result.valid) {
+        _appliedPromoCode = result.promoCode ?? code;
+        _appliedDiscount = result.discountAmount;
+        _promoErrorMessage = null;
+      } else {
+        _promoErrorMessage = result.message;
+      }
+    });
+
+    if (result.valid) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('🎉 Promo code "$code" applied! Saved ${result.discountAmount.toStringAsFixed(2)} Birr'),
+          backgroundColor: const Color(0xFF16A34A),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
+  void _removePromoCode() {
+    setState(() {
+      _appliedPromoCode = null;
+      _appliedDiscount = 0.0;
+      _promoController.clear();
+      _promoErrorMessage = null;
+    });
   }
 
   void _copyToClipboard(String text, String label) {
@@ -825,7 +883,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     final double foodPrice = isFood ? (deliveryProvider.draftFoodPrice ?? 350.00) : 0.00;
     final double deliveryFee = isFood ? 100.00 : 120.00;
     final double serviceFee = isFood ? 20.00 : 0.00;
-    final double totalPrice = foodPrice + deliveryFee + serviceFee;
+    final double grossPrice = foodPrice + deliveryFee + serviceFee;
+    final double totalPrice = (grossPrice - _appliedDiscount).clamp(0.0, double.infinity);
 
     final isPaymentSelected = _selectedMethod != null;
     final isReceiptUploaded = _uploadedReceipt != null;
@@ -859,12 +918,19 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
               const SizedBox(height: 16),
 
+              // Promo Voucher Card
+              _buildPromoCodeCard(foodPrice > 0 ? foodPrice : 200.0, deliveryFee),
+
+              const SizedBox(height: 16),
+
               // 2. POS Invoice Breakdown
               _buildPosInvoiceCard(
                 isFood: isFood,
                 foodPrice: foodPrice,
                 deliveryFee: deliveryFee,
                 serviceFee: serviceFee,
+                discountAmount: _appliedDiscount,
+                appliedPromoCode: _appliedPromoCode,
                 totalPrice: totalPrice,
                 currencyFormatter: currencyFormatter,
                 deliveryProvider: deliveryProvider,
@@ -1403,11 +1469,179 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     );
   }
 
+  Widget _buildPromoCodeCard(double subtotal, double deliveryFee) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: _appliedPromoCode != null 
+              ? const Color(0xFF86EFAC) 
+              : const Color(0xFFE2E8F0),
+          width: _appliedPromoCode != null ? 1.5 : 1,
+        ),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x06000000),
+            blurRadius: 8,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: _appliedPromoCode != null ? const Color(0xFFDCFCE7) : const Color(0xFFEFF6FF),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(
+                  Icons.local_offer_rounded,
+                  size: 16,
+                  color: _appliedPromoCode != null ? const Color(0xFF16A34A) : AppColors.primary,
+                ),
+              ),
+              const SizedBox(width: 8),
+              const Text(
+                'Have a Promo Code?',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          if (_appliedPromoCode != null) ...[
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF0FDF4),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFF86EFAC)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.check_circle_rounded, color: Color(0xFF16A34A), size: 18),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '$_appliedPromoCode Applied!',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFF15803D),
+                          ),
+                        ),
+                        Text(
+                          'Saved ${_appliedDiscount.toStringAsFixed(2)} Birr on your order',
+                          style: const TextStyle(fontSize: 11, color: Color(0xFF16A34A)),
+                        ),
+                      ],
+                    ),
+                  ),
+                  InkWell(
+                    onTap: _removePromoCode,
+                    child: const Padding(
+                      padding: EdgeInsets.all(4.0),
+                      child: Icon(Icons.close_rounded, size: 18, color: Color(0xFF15803D)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ] else ...[
+            Row(
+              children: [
+                Expanded(
+                  child: Container(
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    alignment: Alignment.center,
+                    child: TextField(
+                      controller: _promoController,
+                      textCapitalization: TextCapitalization.characters,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 1.0,
+                        color: AppColors.textPrimary,
+                      ),
+                      decoration: const InputDecoration(
+                        isDense: true,
+                        hintText: 'e.g. WELCOME20',
+                        hintStyle: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.normal,
+                          letterSpacing: 0,
+                          color: AppColors.textMuted,
+                        ),
+                        border: InputBorder.none,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                SizedBox(
+                  height: 44,
+                  child: ElevatedButton(
+                    onPressed: _isValidatingPromo ? null : () => _applyPromoCode(subtotal, deliveryFee),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                    ),
+                    child: _isValidatingPromo
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                          )
+                        : const Text(
+                            'Apply',
+                            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                          ),
+                  ),
+                ),
+              ],
+            ),
+            if (_promoErrorMessage != null) ...[
+              const SizedBox(height: 6),
+              Text(
+                _promoErrorMessage!,
+                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.error),
+              ),
+            ],
+          ],
+        ],
+      ),
+    );
+  }
+
   Widget _buildPosInvoiceCard({
     required bool isFood,
     required double foodPrice,
     required double deliveryFee,
     required double serviceFee,
+    double discountAmount = 0.0,
+    String? appliedPromoCode,
     required double totalPrice,
     required NumberFormat currencyFormatter,
     required DeliveryProvider deliveryProvider,
@@ -1488,6 +1722,15 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             const SizedBox(height: 8),
           ],
 
+          if (discountAmount > 0) ...[
+            _buildInvoiceRow(
+              'Promo Discount (${appliedPromoCode ?? 'VOUCHER'})',
+              '-${currencyFormatter.format(discountAmount)} Birr',
+              valueColor: const Color(0xFF16A34A),
+            ),
+            const SizedBox(height: 8),
+          ],
+
           const SizedBox(height: 4),
           const Divider(height: 1, color: Color(0xFFE2E8F0)),
           const SizedBox(height: 12),
@@ -1528,7 +1771,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     );
   }
 
-  Widget _buildInvoiceRow(String title, String amount, {String? subtitle}) {
+  Widget _buildInvoiceRow(String title, String amount, {String? subtitle, Color? valueColor}) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1553,7 +1796,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         ),
         Text(
           amount,
-          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+          style: TextStyle(
+            fontSize: 13, 
+            fontWeight: FontWeight.w700, 
+            color: valueColor ?? AppColors.textPrimary,
+          ),
         ),
       ],
     );

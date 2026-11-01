@@ -43,5 +43,9 @@ class ApiEndpoints {
   static const String foods = '/api/v1/foods';
   static const String customerFoodOrders = '/api/v1/customer/orders';
   static String customerFoodOrderDetails(String id) => '/api/v1/customer/orders/$id';
+
+  // Promotions & Discounts (/api/v1/promotions)
+  static const String validatePromotion = '/api/v1/promotions/validate';
+  static const String promotions = '/api/v1/promotions';
 }
 
