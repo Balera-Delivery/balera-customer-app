@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -26,6 +27,8 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  Timer? _refreshTimer;
+
   @override
   void initState() {
     super.initState();
@@ -34,6 +37,17 @@ class _HomeScreenState extends State<HomeScreen> {
       context.read<NotificationProvider>().fetchNotifications();
       PermissionPromptService.checkAndPromptPermissions(context);
     });
+    _refreshTimer = Timer.periodic(const Duration(seconds: 8), (_) {
+      if (mounted) {
+        context.read<DeliveryProvider>().fetchDeliveries();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _refreshTimer?.cancel();
+    super.dispose();
   }
 
   void _openTrackOrder(BuildContext context, [DeliveryModel? specificDelivery]) {
