@@ -53,6 +53,8 @@ dependencies:
   flutter_animate: ^4.5.2
 
   # Maps & Location
+  flutter_map: ^7.0.2
+  latlong2: ^0.9.1
   google_maps_flutter: ^2.12.3
   geolocator: ^13.0.4
   image_picker: ^1.2.1
@@ -71,4 +73,12 @@ flutter:
     - assets/images/
     - assets/icons/
     - assets/logo/
+    - assets/fonts/
+
+  fonts:
+    - family: Roboto
+      fonts:
+        - asset: assets/fonts/Roboto-Regular.ttf
+        - asset: assets/fonts/Roboto-Bold.ttf
+          weight: 700
 

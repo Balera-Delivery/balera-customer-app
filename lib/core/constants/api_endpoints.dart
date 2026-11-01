@@ -2,13 +2,18 @@ import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart' show kIsWeb;
 
 class ApiEndpoints {
+  // Optional override if connecting over local Wi-Fi (e.g. 'http://192.168.1.50:5000')
+  static String? customBaseUrl;
+
   // Dynamic default baseUrl depending on runtime platform:
-  // - Android emulator uses 10.0.2.2 to access host machine's localhost
-  // - Windows / macOS / Linux / Web uses localhost
+  // - Physical Android device via USB: http://127.0.0.1:5000 (after `adb reverse tcp:5000 tcp:5000`)
+  // - Android emulator: works with both 127.0.0.1 (via adb reverse) and 10.0.2.2
+  // - Windows / macOS / Linux / Web: http://localhost:5000
   static String get baseUrl {
+    if (customBaseUrl != null) return customBaseUrl!;
     if (kIsWeb) return 'http://localhost:5000';
     try {
-      if (Platform.isAndroid) return 'http://10.0.2.2:5000';
+      if (Platform.isAndroid) return 'http://127.0.0.1:5000';
     } catch (_) {}
     return 'http://localhost:5000';
   }

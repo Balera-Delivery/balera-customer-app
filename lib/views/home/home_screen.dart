@@ -10,6 +10,7 @@ import '../../models/delivery_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/delivery_provider.dart';
 import '../../providers/notification_provider.dart';
+import '../../services/permission_prompt_service.dart';
 import '../delivery/create_delivery_screen.dart';
 import '../delivery/delivery_details_screen.dart';
 import '../delivery/delivery_otp_screen.dart';
@@ -31,6 +32,7 @@ class _HomeScreenState extends State<HomeScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<DeliveryProvider>().fetchDeliveries();
       context.read<NotificationProvider>().fetchNotifications();
+      PermissionPromptService.checkAndPromptPermissions(context);
     });
   }
 
@@ -141,30 +143,35 @@ class _HomeScreenState extends State<HomeScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(7),
-                        decoration: BoxDecoration(
-                          color: isCurrent ? const Color(0xFFEFF6FF) : const Color(0xFFF1F5F9),
-                          borderRadius: BorderRadius.circular(8),
+                  Expanded(
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(7),
+                          decoration: BoxDecoration(
+                            color: isCurrent ? const Color(0xFFEFF6FF) : const Color(0xFFF1F5F9),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Icon(
+                            _getItemIcon(item.itemType),
+                            size: 16,
+                            color: isCurrent ? AppColors.primary : AppColors.textPrimary,
+                          ),
                         ),
-                        child: Icon(
-                          _getItemIcon(item.itemType),
-                          size: 16,
-                          color: isCurrent ? AppColors.primary : AppColors.textPrimary,
+                        const SizedBox(width: 8),
+                        Flexible(
+                          child: Text(
+                            '#${item.trackingCode ?? item.id}',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w800,
+                              fontSize: 13,
+                              color: AppColors.textPrimary,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        '#${item.trackingCode ?? item.id}',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w800,
-                          fontSize: 13,
-                          color: AppColors.textPrimary,
-                        ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                   StatusBadge(status: item.status),
                 ],
@@ -467,12 +474,12 @@ class _HomeScreenState extends State<HomeScreen> {
                             const SizedBox(height: 16),
 
                             // Micro Feature Pills
-                            Row(
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 6,
                               children: [
                                 _buildHeroChip(Icons.verified_user_rounded, 'OTP Verified'),
-                                const SizedBox(width: 8),
                                 _buildHeroChip(Icons.location_on_rounded, 'Live GPS'),
-                                const SizedBox(width: 8),
                                 _buildHeroChip(Icons.speed_rounded, 'Fast Pickup'),
                               ],
                             ),

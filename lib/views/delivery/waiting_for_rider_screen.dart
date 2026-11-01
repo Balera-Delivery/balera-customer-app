@@ -125,34 +125,12 @@ class _WaitingForRiderScreenState extends State<WaitingForRiderScreen> {
             return;
           }
 
-          if (isManual) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Status refreshed at ${_formatTime(_lastCheckedTime)}: Still waiting for admin assignment.'),
-                backgroundColor: AppColors.primary,
-                duration: const Duration(seconds: 2),
-              ),
-            );
-          }
-        } else if (isManual) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Status checked: Waiting for admin assignment.'),
-              duration: Duration(seconds: 2),
-            ),
-          );
+          // Silent refresh unless status actually changed
         }
       }
     } catch (_) {
-      if (isManual && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Could not reach server. Will retry automatically.'),
-            backgroundColor: AppColors.textMuted,
-            duration: Duration(seconds: 2),
-          ),
-        );
-      }
+      // Silent retry in background
+    }
     } finally {
       if (mounted) {
         setState(() {

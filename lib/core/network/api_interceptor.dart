@@ -11,6 +11,14 @@ class ApiInterceptor extends Interceptor {
     options.headers['Content-Type'] = 'application/json';
     options.headers['Accept'] = 'application/json';
 
+    // Auto-generate Idempotency-Key for mutating actions if not already provided
+    if (['POST', 'PUT', 'PATCH'].contains(options.method.toUpperCase())) {
+      if (!options.headers.containsKey('Idempotency-Key')) {
+        final randomPart = (DateTime.now().microsecondsSinceEpoch ^ (options.data?.hashCode ?? 0)).abs().toRadixString(36);
+        options.headers['Idempotency-Key'] = 'cust_${DateTime.now().millisecondsSinceEpoch}_$randomPart';
+      }
+    }
+
     return handler.next(options);
   }
 
