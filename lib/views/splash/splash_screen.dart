@@ -364,49 +364,61 @@ class _SplashScreenState extends State<SplashScreen> {
                                   ),
                                 ),
 
-                                // Main Hero Circle Container
+                                // Main Hero Container (Squircle for Logo, Circle for Photos)
                                 Container(
                                   width: heroDiameter,
                                   height: heroDiameter,
                                   decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    color: Colors.white,
+                                    shape: item.isLogo
+                                        ? BoxShape.rectangle
+                                        : BoxShape.circle,
+                                    borderRadius: item.isLogo
+                                        ? BorderRadius.circular(heroDiameter * 0.24)
+                                        : null,
+                                    color: item.isLogo
+                                        ? const Color(0xFF030D26)
+                                        : Colors.white,
                                     border: Border.all(
-                                      color: Colors.white,
-                                      width: 4.5,
+                                      color: item.isLogo
+                                          ? const Color(0xFF0077FF).withValues(alpha: 0.35)
+                                          : Colors.white,
+                                      width: item.isLogo ? 2.5 : 4.5,
                                     ),
                                     boxShadow: [
                                       BoxShadow(
                                         color: const Color(0xFF0047BA)
-                                            .withValues(alpha: 0.16),
-                                        blurRadius: 28,
-                                        spreadRadius: 2,
+                                            .withValues(alpha: item.isLogo ? 0.32 : 0.16),
+                                        blurRadius: item.isLogo ? 36 : 28,
+                                        spreadRadius: item.isLogo ? 4 : 2,
                                         offset: const Offset(0, 10),
                                       ),
+                                      if (item.isLogo)
+                                        BoxShadow(
+                                          color: const Color(0xFF00D2FF)
+                                              .withValues(alpha: 0.22),
+                                          blurRadius: 40,
+                                          spreadRadius: 2,
+                                          offset: const Offset(0, 0),
+                                        ),
                                       BoxShadow(
                                         color: Colors.black
-                                            .withValues(alpha: 0.05),
+                                            .withValues(alpha: 0.08),
                                         blurRadius: 8,
                                         offset: const Offset(0, 3),
                                       ),
                                     ],
                                   ),
-                                  child: ClipOval(
-                                    child: item.isLogo
-                                        ? Container(
-                                            color: Colors.white,
-                                            padding: const EdgeInsets.all(22.0),
-                                            child: Image.asset(
-                                              item.imagePath,
-                                              fit: BoxFit.contain,
-                                              filterQuality: FilterQuality.high,
-                                            ),
-                                          )
-                                        : Image.asset(
-                                            item.imagePath,
-                                            fit: BoxFit.cover,
-                                            filterQuality: FilterQuality.high,
-                                          ),
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(
+                                      item.isLogo
+                                          ? heroDiameter * 0.24
+                                          : heroDiameter * 0.5,
+                                    ),
+                                    child: Image.asset(
+                                      item.imagePath,
+                                      fit: BoxFit.cover,
+                                      filterQuality: FilterQuality.high,
+                                    ),
                                   ),
                                 )
                                     .animate(key: ValueKey('hero_$index'))

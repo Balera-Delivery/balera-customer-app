@@ -49,6 +49,9 @@ class StorageService {
     return await prefs.remove(AppConstants.keyUser);
   }
 
+  // Callback triggered when session expires
+  static void Function()? onSessionExpired;
+
   // Onboarding
   static Future<bool> setOnboardingComplete(bool complete) async {
     return await prefs.setBool(AppConstants.keyOnboardingComplete, complete);
@@ -58,9 +61,19 @@ class StorageService {
     return prefs.getBool(AppConstants.keyOnboardingComplete) ?? false;
   }
 
+  // Navigation State Persistence (Remember where user left off)
+  static Future<bool> saveLastNavIndex(int index) async {
+    return await prefs.setInt(AppConstants.keyLastNavIndex, index);
+  }
+
+  static int getLastNavIndex() {
+    return prefs.getInt(AppConstants.keyLastNavIndex) ?? 0;
+  }
+
   // Clear All on Logout
   static Future<void> clearSession() async {
     await removeToken();
     await removeUser();
+    await prefs.remove(AppConstants.keyLastNavIndex);
   }
 }

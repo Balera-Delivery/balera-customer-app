@@ -162,17 +162,17 @@ class _LiveTrackingScreenState extends State<LiveTrackingScreen> {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: const [
                           Text(
-                            'Estimated arrival',
+                            'Delivery Status',
                             style: TextStyle(fontSize: 12, color: AppColors.textMuted),
                           ),
                           Row(
                             children: [
                               Text(
-                                '7 min (2.5 km)',
+                                'In Transit',
                                 style: TextStyle(
                                   fontSize: 13,
                                   fontWeight: FontWeight.w700,
-                                  color: AppColors.textPrimary,
+                                  color: AppColors.primary,
                                 ),
                               ),
                               SizedBox(width: 4),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/utils/validators.dart';
@@ -6,6 +7,7 @@ import '../../core/widgets/balera_logo.dart';
 import '../../core/widgets/custom_button.dart';
 import '../../core/widgets/custom_text_field.dart';
 import '../../providers/auth_provider.dart';
+import '../../services/storage_service.dart';
 import '../main/main_navigation_screen.dart';
 import '../splash/splash_screen.dart';
 import 'forgot_password_screen.dart';
@@ -55,9 +57,14 @@ class _LoginScreenState extends State<LoginScreen> {
 
     if (mounted) {
       if (success) {
-        Navigator.pushReplacement(
+        Navigator.pushAndRemoveUntil(
           context,
-          MaterialPageRoute(builder: (_) => const MainNavigationScreen()),
+          MaterialPageRoute(
+            builder: (_) => MainNavigationScreen(
+              initialIndex: StorageService.getLastNavIndex(),
+            ),
+          ),
+          (route) => false,
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -75,15 +82,15 @@ class _LoginScreenState extends State<LoginScreen> {
     final authProvider = context.watch<AuthProvider>();
 
     return PopScope(
-      canPop: false,
+      canPop: StorageService.isOnboardingComplete(),
       onPopInvokedWithResult: (didPop, result) {
         if (didPop) return;
         _navigateToSplash();
       },
       child: Scaffold(
-        backgroundColor: Colors.white,
+        backgroundColor: const Color(0xFFF8FAFD),
         appBar: AppBar(
-          backgroundColor: Colors.white,
+          backgroundColor: Colors.transparent,
           elevation: 0,
           leading: IconButton(
             icon: const Icon(
@@ -91,150 +98,212 @@ class _LoginScreenState extends State<LoginScreen> {
               size: 20,
               color: AppColors.textPrimary,
             ),
-            onPressed: _navigateToSplash,
+            onPressed: () {
+              if (StorageService.isOnboardingComplete()) {
+                SystemNavigator.pop();
+              } else {
+                _navigateToSplash();
+              }
+            },
           ),
         ),
         body: SafeArea(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 8.0),
+            padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 6.0),
             child: Form(
               key: _formKey,
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 6),
 
-                  // Top Balera Logo (Screen 02)
-                  const Center(
-                    child: BaleraLogo(size: 110),
-                  ),
-
-                const SizedBox(height: 36),
-
-                // Welcome Back Header (Screen 02)
-                const Center(
-                  child: Column(
-                    children: [
-                      Text(
-                        'Welcome Back',
-                        style: TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.textPrimary,
+                  // Top Balera Logo with Soft Ambient Halo
+                  Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.primary.withValues(alpha: 0.18),
+                          blurRadius: 28,
+                          spreadRadius: 2,
+                          offset: const Offset(0, 6),
                         ),
-                      ),
-                      SizedBox(height: 4),
-                      Text(
-                        'Login to continue',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                const SizedBox(height: 36),
-
-                // Phone Number Field
-                CustomTextField(
-                  label: 'Phone Number',
-                  hint: 'Enter your phone number',
-                  controller: _identifierController,
-                  keyboardType: TextInputType.phone,
-                  validator: Validators.phone,
-                ),
-
-                const SizedBox(height: 20),
-
-                // Password Field with Eye Toggle (Screen 02)
-                CustomTextField(
-                  label: 'Password',
-                  hint: 'Enter your password',
-                  controller: _passwordController,
-                  isPassword: true,
-                  validator: Validators.password,
-                ),
-
-                const SizedBox(height: 12),
-
-                // Forgot Password Link (Screen 02)
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: TextButton(
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => const ForgotPasswordScreen()),
-                      );
-                    },
-                    style: TextButton.styleFrom(
-                      padding: EdgeInsets.zero,
-                      minimumSize: Size.zero,
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ],
                     ),
-                    child: const Text(
-                      'Forgot Password?',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.primary,
-                      ),
-                    ),
+                    child: const BaleraLogo(size: 96),
                   ),
-                ),
 
-                const SizedBox(height: 28),
+                  const SizedBox(height: 24),
 
-                // Login Button (Screen 02)
-                CustomButton(
-                  text: 'Login',
-                  isLoading: authProvider.status == AuthStatus.loading,
-                  onPressed: _handleLogin,
-                ),
-
-                const SizedBox(height: 44),
-
-                // Bottom Register Link (Screen 02)
-                Center(
-                  child: Wrap(
-                    alignment: WrapAlignment.center,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    children: [
-                      const Text(
-                        "Don't have an account? ",
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: AppColors.textSecondary,
+                  // Elevated Main Card Container
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: 22.0, vertical: 26.0),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(28),
+                      border: Border.all(color: const Color(0xFFE2E8F0), width: 1.2),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF0038A8).withValues(alpha: 0.08),
+                          blurRadius: 28,
+                          offset: const Offset(0, 10),
                         ),
-                      ),
-                      GestureDetector(
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (_) => const RegisterScreen()),
-                          );
-                        },
-                        child: const Text(
-                          'Create Account',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.primary,
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.03),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Card Header
+                        Center(
+                          child: Column(
+                            children: const [
+                              Text(
+                                'Welcome Back',
+                                style: TextStyle(
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.w900,
+                                  color: AppColors.textPrimary,
+                                  letterSpacing: -0.4,
+                                ),
+                              ),
+                              SizedBox(height: 4),
+                              Text(
+                                'Login to continue to your account',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: AppColors.textSecondary,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                      ),
-                    ],
+
+                        const SizedBox(height: 24),
+
+                        // Phone Number Field
+                        CustomTextField(
+                          label: 'Phone Number',
+                          hint: 'Enter your phone number',
+                          controller: _identifierController,
+                          keyboardType: TextInputType.phone,
+                          validator: Validators.phone,
+                        ),
+
+                        const SizedBox(height: 18),
+
+                        // Password Field
+                        CustomTextField(
+                          label: 'Password',
+                          hint: 'Enter your password',
+                          controller: _passwordController,
+                          isPassword: true,
+                          validator: Validators.password,
+                        ),
+
+                        const SizedBox(height: 12),
+
+                        // Forgot Password Link
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: TextButton(
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(builder: (_) => const ForgotPasswordScreen()),
+                              );
+                            },
+                            style: TextButton.styleFrom(
+                              padding: EdgeInsets.zero,
+                              minimumSize: Size.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
+                            child: const Text(
+                              'Forgot Password?',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.primary,
+                              ),
+                            ),
+                          ),
+                        ),
+
+                        const SizedBox(height: 24),
+
+                        // Login Button
+                        CustomButton(
+                          text: 'Login',
+                          isLoading: authProvider.status == AuthStatus.loading,
+                          onPressed: _handleLogin,
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              ],
+
+                  const SizedBox(height: 26),
+
+                  // Bottom Register Link Card Pill
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.03),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Wrap(
+                      alignment: WrapAlignment.center,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        const Text(
+                          "Don't have an account? ",
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: AppColors.textSecondary,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        GestureDetector(
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (_) => const RegisterScreen()),
+                            );
+                          },
+                          child: const Text(
+                            'Create Account',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                ],
+              ),
             ),
           ),
         ),
       ),
-    ),
-  );
-}
+    );
+  }
 }
 

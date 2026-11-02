@@ -9,6 +9,7 @@ import '../../core/widgets/custom_button.dart';
 import '../../providers/delivery_provider.dart';
 import '../../services/promotion_service.dart';
 import 'request_submitted_screen.dart';
+import 'request_submitted_dialog.dart';
 
 enum PaymentMethod { telebirr, cbe, awash }
 
@@ -855,19 +856,25 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     deliveryProvider.draftPaymentMethod = paymentMethodName;
     deliveryProvider.draftReceiptUrl = receiptUrl;
 
-    final newDelivery = await deliveryProvider.createDeliveryFromDraft();
+    try {
+      final newDelivery = await deliveryProvider.createDeliveryFromDraft();
 
-    if (mounted) {
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(
-          builder: (_) => RequestSubmittedScreen(
-            deliveryId: newDelivery.id,
-            trackingCode: newDelivery.trackingCode,
+      if (mounted) {
+        showRequestSubmittedCardPopup(
+          context,
+          deliveryId: newDelivery.id,
+          trackingCode: newDelivery.trackingCode,
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to submit delivery: ${e.toString().replaceAll("Exception: ", "")}'),
+            backgroundColor: AppColors.error,
           ),
-        ),
-        (route) => route.isFirst,
-      );
+        );
+      }
     }
   }
 

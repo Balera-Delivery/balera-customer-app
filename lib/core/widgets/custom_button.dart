@@ -60,20 +60,41 @@ class CustomButton extends StatelessWidget {
       return null;
     }
 
-    return SizedBox(
+    final isPrimary = type == ButtonType.primary;
+
+    return Container(
       width: width ?? double.infinity,
       height: height,
+      decoration: BoxDecoration(
+        borderRadius: radius,
+        gradient: isPrimary && !isLoading && onPressed != null
+            ? AppColors.primaryGradient
+            : null,
+        boxShadow: isPrimary && !isLoading && onPressed != null
+            ? [
+                BoxShadow(
+                  color: AppColors.primary.withValues(alpha: 0.30),
+                  blurRadius: 14,
+                  offset: const Offset(0, 5),
+                  spreadRadius: 0,
+                ),
+              ]
+            : null,
+      ),
       child: ElevatedButton(
         onPressed: isLoading ? null : onPressed,
         style: ElevatedButton.styleFrom(
-          backgroundColor: getBackgroundColor(),
+          backgroundColor: isPrimary ? Colors.transparent : getBackgroundColor(),
+          shadowColor: Colors.transparent,
           foregroundColor: getForegroundColor(),
           elevation: 0,
           shape: RoundedRectangleBorder(
             borderRadius: radius,
             side: getBorder() ?? BorderSide.none,
           ),
-          disabledBackgroundColor: getBackgroundColor().withValues(alpha: 0.6),
+          disabledBackgroundColor: isPrimary
+              ? AppColors.primary.withValues(alpha: 0.5)
+              : getBackgroundColor().withValues(alpha: 0.6),
           padding: const EdgeInsets.symmetric(horizontal: 20),
         ),
         child: isLoading
@@ -99,6 +120,7 @@ class CustomButton extends StatelessWidget {
                       fontSize: 15,
                       fontWeight: FontWeight.w700,
                       color: getForegroundColor(),
+                      letterSpacing: 0.2,
                     ),
                   ),
                 ],

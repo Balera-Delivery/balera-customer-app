@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -27,6 +28,9 @@ class DeliveryOtpScreen extends StatefulWidget {
 class _DeliveryOtpScreenState extends State<DeliveryOtpScreen> {
   String? _loadedOtp;
   bool _showOtpInstead = false;
+  Timer? _pollTimer;
+  bool _isCheckingCompletion = false;
+  bool _hasNavigatedToCompleted = false;
 
   @override
   void initState() {
@@ -41,6 +45,290 @@ class _DeliveryOtpScreenState extends State<DeliveryOtpScreen> {
         });
       }
     });
+    _startAdaptivePolling();
+  }
+
+  @override
+  void dispose() {
+    _pollTimer?.cancel();
+    super.dispose();
+  }
+
+  void _startAdaptivePolling() {
+    _pollTimer?.cancel();
+    _pollTimer = Timer.periodic(const Duration(seconds: 5), (_) async {
+      if (!mounted || _hasNavigatedToCompleted) return;
+      await _checkRiderStatus(silent: true);
+    });
+  }
+
+  Future<void> _checkRiderStatus({bool silent = false}) async {
+    try {
+      final provider = context.read<DeliveryProvider>();
+      final res = await provider.deliveryService.getDeliveryDetails(widget.deliveryId);
+      if (res.success && res.data != null) {
+        final status = res.data!.status.toUpperCase();
+        if (status == 'COMPLETED') {
+          _pollTimer?.cancel();
+          _onRiderVerifiedAndCompleted();
+        }
+      }
+    } catch (_) {}
+  }
+
+  void _onRiderVerifiedAndCompleted() {
+    if (_hasNavigatedToCompleted || !mounted) return;
+    _hasNavigatedToCompleted = true;
+    final provider = context.read<DeliveryProvider>();
+    provider.updateActiveStatus(AppConstants.statusCompleted);
+    provider.fetchDeliveries();
+
+    _showDeliveryCompletedPopup();
+  }
+
+  Future<void> _handleCompleteButtonClick(String displayOtp) async {
+    if (_isCheckingCompletion) return;
+    setState(() => _isCheckingCompletion = true);
+
+    try {
+      final provider = context.read<DeliveryProvider>();
+      final res = await provider.deliveryService.getDeliveryDetails(widget.deliveryId);
+      final currentStatus = (res.data?.status ?? '').toUpperCase();
+
+      if (mounted) {
+        setState(() => _isCheckingCompletion = false);
+        if (currentStatus == 'COMPLETED') {
+          _onRiderVerifiedAndCompleted();
+        } else {
+          _showWaitingForRiderOtpDialog(displayOtp);
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isCheckingCompletion = false);
+        _showWaitingForRiderOtpDialog(displayOtp);
+      }
+    }
+  }
+
+  void _showWaitingForRiderOtpDialog(String otp) {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (dialogCtx) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        backgroundColor: Colors.white,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 64,
+                height: 64,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFEF3C7),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: const Color(0xFFFDE68A), width: 2),
+                ),
+                child: const Center(
+                  child: Icon(
+                    Icons.lock_clock_rounded,
+                    color: Color(0xFFD97706),
+                    size: 34,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Waiting for Rider to Verify OTP',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.textPrimary,
+                  letterSpacing: -0.3,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 10),
+              const Text(
+                'You cannot complete the delivery yet. Please share your 6-digit OTP code below with the rider. The rider must enter and confirm it in their app to finish the delivery.',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: AppColors.textSecondary,
+                  height: 1.45,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Your Delivery OTP',
+                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF94A3B8)),
+                        ),
+                        Text(
+                          otp,
+                          style: const TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 4,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                      ],
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.copy_rounded, color: AppColors.primary, size: 20),
+                      onPressed: () {
+                        Clipboard.setData(ClipboardData(text: otp));
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('OTP copied to clipboard!'),
+                            backgroundColor: AppColors.primary,
+                            duration: Duration(seconds: 2),
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      style: OutlinedButton.styleFrom(
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                      onPressed: () => Navigator.pop(dialogCtx),
+                      child: const Text('Dismiss', style: TextStyle(fontWeight: FontWeight.w600)),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        elevation: 0,
+                      ),
+                      onPressed: () {
+                        Navigator.pop(dialogCtx);
+                        _checkRiderStatus();
+                      },
+                      child: const Text('Check Again', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showDeliveryCompletedPopup() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogCtx) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        backgroundColor: Colors.white,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 76,
+                height: 76,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF0FDF4),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: const Color(0xFF86EFAC), width: 2),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.green.withValues(alpha: 0.15),
+                      blurRadius: 16,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
+                ),
+                child: const Center(
+                  child: Icon(
+                    Icons.check_circle_rounded,
+                    color: Color(0xFF16A34A),
+                    size: 48,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              const Text(
+                'Delivery Completed! 🎉',
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w900,
+                  color: AppColors.textPrimary,
+                  letterSpacing: -0.3,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 10),
+              const Text(
+                'Your package has been successfully delivered and confirmed by rider. Thank you for choosing Balera!',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: AppColors.textSecondary,
+                  height: 1.45,
+                  fontWeight: FontWeight.w500,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    elevation: 0,
+                  ),
+                  onPressed: () {
+                    Navigator.pop(dialogCtx);
+                    Navigator.of(context).popUntil((route) => route.isFirst);
+                  },
+                  child: const Text(
+                    'Done',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -331,19 +619,8 @@ class _DeliveryOtpScreenState extends State<DeliveryOtpScreen> {
               // Primary Action: Confirm Handover & Complete Delivery
               CustomButton(
                 text: 'Package Received - Done',
-                onPressed: () async {
-                  final provider = context.read<DeliveryProvider>();
-                  provider.updateActiveStatus(AppConstants.statusCompleted);
-                  await provider.fetchDeliveries();
-                  if (context.mounted) {
-                    Navigator.pushReplacement(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => DeliveryCompletedScreen(deliveryId: widget.deliveryId),
-                      ),
-                    );
-                  }
-                },
+                isLoading: _isCheckingCompletion,
+                onPressed: () => _handleCompleteButtonClick(displayOtp),
               ),
 
               const SizedBox(height: 12),

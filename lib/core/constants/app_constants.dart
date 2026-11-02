@@ -7,6 +7,7 @@ class AppConstants {
   static const String keyUser = 'user_data';
   static const String keyOnboardingComplete = 'onboarding_complete';
   static const String keyRememberMe = 'remember_me';
+  static const String keyLastNavIndex = 'last_nav_index';
 
   // Timeouts (Increased to 30s connect / 45s receive to prevent timeout aborts)
   static const int connectTimeoutSeconds = 30;

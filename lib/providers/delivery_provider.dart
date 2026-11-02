@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../core/constants/app_constants.dart';
 import '../models/delivery_model.dart';
 import '../services/delivery_service.dart';
+import '../services/storage_service.dart';
 
 class DeliveryProvider extends ChangeNotifier {
   final DeliveryService _deliveryService = DeliveryService();
@@ -34,8 +35,12 @@ class DeliveryProvider extends ChangeNotifier {
   double draftDestinationLng = 39.9789;
 
   List<DeliveryModel> get deliveries => _deliveries;
-  DeliveryModel? get activeDelivery =>
-      _activeDelivery ?? (ongoingDeliveries.isNotEmpty ? ongoingDeliveries.first : null);
+  DeliveryModel? get activeDelivery {
+    if (_activeDelivery != null && AppConstants.isOngoing(_activeDelivery!.status)) {
+      return _activeDelivery;
+    }
+    return ongoingDeliveries.isNotEmpty ? ongoingDeliveries.first : null;
+  }
   LiveTrackingData? get liveTrackingData => _liveTrackingData;
   String? get currentOtp => _currentOtp;
   bool get isLoading => _isLoading;
@@ -70,9 +75,11 @@ class DeliveryProvider extends ChangeNotifier {
       _deliveries.clear();
       _deliveries.addAll(response.data!);
       if (_activeDelivery != null) {
-        final found = _deliveries.where((d) => d.id == _activeDelivery!.id);
+        final found = _deliveries.where((d) => d.id == _activeDelivery!.id && AppConstants.isOngoing(d.status));
         if (found.isNotEmpty) {
           _activeDelivery = found.first;
+        } else {
+          _activeDelivery = ongoingDeliveries.isNotEmpty ? ongoingDeliveries.first : null;
         }
       } else if (ongoingDeliveries.isNotEmpty) {
         _activeDelivery = ongoingDeliveries.first;
@@ -146,12 +153,17 @@ class DeliveryProvider extends ChangeNotifier {
     _errorMessage = null;
     notifyListeners();
 
+    final currentUser = StorageService.getUser();
     final pickup = (draftPickup != null && draftPickup!.trim().isNotEmpty) ? draftPickup!.trim() : 'Pickup Location';
     final destination = (draftDestination != null && draftDestination!.trim().isNotEmpty) ? draftDestination!.trim() : 'Destination';
     final itemDesc = (draftItemDescription != null && draftItemDescription!.trim().isNotEmpty) ? draftItemDescription!.trim() : 'Item';
     final itemT = (draftItemType != null && draftItemType!.trim().isNotEmpty) ? draftItemType!.trim() : 'Package';
-    final receiverN = (draftReceiverName != null && draftReceiverName!.trim().isNotEmpty) ? draftReceiverName!.trim() : 'Receiver';
-    final receiverP = (draftReceiverPhone != null && draftReceiverPhone!.trim().isNotEmpty) ? draftReceiverPhone!.trim() : '0911000000';
+    final receiverN = (draftReceiverName != null && draftReceiverName!.trim().isNotEmpty)
+        ? draftReceiverName!.trim()
+        : (currentUser?.fullName.isNotEmpty == true ? currentUser!.fullName : 'Valued Customer');
+    final receiverP = (draftReceiverPhone != null && draftReceiverPhone!.trim().isNotEmpty)
+        ? draftReceiverPhone!.trim()
+        : (currentUser?.phoneNumber.isNotEmpty == true ? currentUser!.phoneNumber : '0911000000');
 
     final response = await _deliveryService.createDelivery(
       pickupLocation: pickup,
@@ -163,6 +175,7 @@ class DeliveryProvider extends ChangeNotifier {
       instructions: draftInstructions,
       paymentMethod: draftPaymentMethod,
       receiptUrl: draftReceiptUrl,
+      restaurantId: draftRestaurantId,
       pickupLat: draftPickupLat,
       pickupLng: draftPickupLng,
       destinationLat: draftDestinationLat,
@@ -180,36 +193,12 @@ class DeliveryProvider extends ChangeNotifier {
       notifyListeners();
       return newDelivery;
     } else {
-      _errorMessage = response.message.isNotEmpty ? response.message : 'Failed to submit delivery request.';
+      final errorMsg = response.message.isNotEmpty
+          ? response.message
+          : 'Failed to submit delivery request. Please check your network connection.';
+      _errorMessage = errorMsg;
       notifyListeners();
-      // Fallback local delivery so user flow isn't completely broken if offline
-      final fallback = DeliveryModel(
-        id: 'DLV-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}',
-        customerId: 'LOCAL_USR',
-        pickupLocation: pickup,
-        destination: destination,
-        itemType: itemT,
-        itemDescription: itemDesc,
-        receiverName: receiverN,
-        receiverPhone: receiverP,
-        instructions: draftInstructions,
-        status: AppConstants.statusPending,
-        paymentMethod: draftPaymentMethod,
-        paymentStatus: draftReceiptUrl != null ? 'PAID_PENDING_VERIFICATION' : 'PENDING',
-        receiptUrl: draftReceiptUrl,
-        otpCode: '482913',
-        createdAt: DateTime.now(),
-        updatedAt: DateTime.now(),
-        pickupLat: draftPickupLat,
-        pickupLng: draftPickupLng,
-        destinationLat: draftDestinationLat,
-        destinationLng: draftDestinationLng,
-      );
-      _deliveries.insert(0, fallback);
-      _activeDelivery = fallback;
-      clearDraft();
-      notifyListeners();
-      return fallback;
+      throw Exception(errorMsg);
     }
   }
 
@@ -244,7 +233,9 @@ class DeliveryProvider extends ChangeNotifier {
         );
         _deliveries[index] = updated;
         if (_activeDelivery?.id == deliveryId) {
-          _activeDelivery = updated;
+          _activeDelivery = ongoingDeliveries.where((d) => d.id != deliveryId).isNotEmpty
+              ? ongoingDeliveries.where((d) => d.id != deliveryId).first
+              : null;
         }
       }
       notifyListeners();

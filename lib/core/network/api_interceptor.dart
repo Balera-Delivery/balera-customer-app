@@ -29,9 +29,14 @@ class ApiInterceptor extends Interceptor {
 
   @override
   void onError(DioException err, ErrorInterceptorHandler handler) {
-    // Handle 401 Unauthorized globally if token expired
-    if (err.response?.statusCode == 401) {
+    // Only handle 401 Unauthorized globally if token expired on an authenticated endpoint
+    // Never clear session on login/register attempt failures or unauthenticated requests!
+    final path = err.requestOptions.path;
+    final isAuthEndpoint = path.contains('/auth/login') || path.contains('/auth/register');
+
+    if (err.response?.statusCode == 401 && !isAuthEndpoint && err.requestOptions.headers.containsKey('Authorization')) {
       StorageService.clearSession();
+      StorageService.onSessionExpired?.call();
     }
     return handler.next(err);
   }
