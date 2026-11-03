@@ -1,28 +1,88 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+
 import '../../core/constants/app_colors.dart';
-import '../../core/widgets/custom_button.dart';
-import '../../core/widgets/partner_cover_image.dart';
+import '../../core/constants/app_constants.dart';
 import '../../models/food_item_model.dart';
 import '../../models/restaurant_model.dart';
 import '../../providers/delivery_provider.dart';
 import '../../providers/restaurant_provider.dart';
-import 'checkout_screen.dart';
 import 'destination_location_screen.dart';
 import 'pickup_location_screen.dart';
+import 'request_submitted_screen.dart';
+import 'request_submitted_dialog.dart';
 
 enum DeliveryCategory { food, other }
 
+enum PaymentMethod { telebirr, cbe, awash }
+
+class PaymentAccountInfo {
+  final PaymentMethod method;
+  final String title;
+  final String accountNumber;
+  final String accountHolder;
+  final String iconAsset;
+  final IconData fallbackIcon;
+  final Color brandColor;
+  final Color brandBgColor;
+
+  const PaymentAccountInfo({
+    required this.method,
+    required this.title,
+    required this.accountNumber,
+    required this.accountHolder,
+    required this.iconAsset,
+    required this.fallbackIcon,
+    required this.brandColor,
+    required this.brandBgColor,
+  });
+}
+
+class UploadedReceipt {
+  final String fileName;
+  final String fileSize;
+  final String uploadedAt;
+  final String? previewType;
+  final String? receiptUrl;
+  final Uint8List? fileBytes;
+  final String? filePath;
+
+  const UploadedReceipt({
+    required this.fileName,
+    required this.fileSize,
+    required this.uploadedAt,
+    this.previewType,
+    this.receiptUrl,
+    this.fileBytes,
+    this.filePath,
+  });
+}
+
 class CreateDeliveryScreen extends StatefulWidget {
-  const CreateDeliveryScreen({super.key});
+  final DeliveryCategory? initialCategory;
+  final String? initialItemType;
+
+  const CreateDeliveryScreen({
+    super.key,
+    this.initialCategory,
+    this.initialItemType,
+  });
 
   @override
   State<CreateDeliveryScreen> createState() => _CreateDeliveryScreenState();
 }
 
 class _CreateDeliveryScreenState extends State<CreateDeliveryScreen> {
+  // Step index: 0 = Service & Details, 1 = Pickup & Destination, 2 = Checkout & Payment
+  int _currentStep = 0;
+
   DeliveryCategory _selectedCategory = DeliveryCategory.food;
+  String _selectedItemType = 'Parcel / Box';
 
   late TextEditingController _pickupController;
   late TextEditingController _destinationController;
@@ -39,6 +99,45 @@ class _CreateDeliveryScreenState extends State<CreateDeliveryScreen> {
   String? _selectedRestaurantId;
   bool _isLocating = false;
 
+  // Checkout State
+  PaymentMethod? _selectedPaymentMethod;
+  UploadedReceipt? _uploadedReceipt;
+  bool _isPickingReceipt = false;
+  bool _isSubmitting = false;
+
+  final List<PaymentAccountInfo> _paymentAccounts = const [
+    PaymentAccountInfo(
+      method: PaymentMethod.telebirr,
+      title: 'Telebirr',
+      accountNumber: '0911 234 567',
+      accountHolder: 'Balera Delivery Service',
+      iconAsset: 'assets/icons/telebirr.png',
+      fallbackIcon: Icons.phone_android_rounded,
+      brandColor: Color(0xFF0070BA),
+      brandBgColor: Color(0xFFEFF6FF),
+    ),
+    PaymentAccountInfo(
+      method: PaymentMethod.cbe,
+      title: 'Commercial Bank of Ethiopia (CBE)',
+      accountNumber: '1000 4829 1948 2',
+      accountHolder: 'Balera Logistics PLC',
+      iconAsset: 'assets/icons/cbe.png',
+      fallbackIcon: Icons.account_balance_rounded,
+      brandColor: Color(0xFF6B21A8),
+      brandBgColor: Color(0xFFFAF5FF),
+    ),
+    PaymentAccountInfo(
+      method: PaymentMethod.awash,
+      title: 'Awash Bank',
+      accountNumber: '0130 4829 1048 00',
+      accountHolder: 'Balera Logistics PLC',
+      iconAsset: 'assets/icons/awash.png',
+      fallbackIcon: Icons.savings_rounded,
+      brandColor: Color(0xFF0D9488),
+      brandBgColor: Color(0xFFF0FDFA),
+    ),
+  ];
+
   @override
   void initState() {
     super.initState();
@@ -46,15 +145,21 @@ class _CreateDeliveryScreenState extends State<CreateDeliveryScreen> {
     _pickupController = TextEditingController(text: deliveryProvider.draftPickup ?? '');
     _destinationController = TextEditingController(text: deliveryProvider.draftDestination ?? '');
 
-    if (deliveryProvider.draftItemDescription != null && deliveryProvider.draftItemDescription!.isNotEmpty) {
+    if (widget.initialCategory != null) {
+      _selectedCategory = widget.initialCategory!;
+    } else if (deliveryProvider.draftItemDescription != null &&
+        deliveryProvider.draftItemDescription!.isNotEmpty) {
       _itemDescriptionController.text = deliveryProvider.draftItemDescription!;
-      if (deliveryProvider.draftItemType == 'Food & Groceries') {
-        _selectedCategory = DeliveryCategory.food;
-      } else {
-        _selectedCategory = DeliveryCategory.other;
-      }
+      _selectedCategory = deliveryProvider.draftItemType == 'Food & Groceries'
+          ? DeliveryCategory.food
+          : DeliveryCategory.other;
     } else {
       _selectedCategory = DeliveryCategory.food;
+    }
+
+    if (widget.initialItemType != null) {
+      _selectedItemType = widget.initialItemType!;
+      deliveryProvider.draftItemType = widget.initialItemType;
     }
 
     if (deliveryProvider.draftInstructions != null) {
@@ -63,7 +168,16 @@ class _CreateDeliveryScreenState extends State<CreateDeliveryScreen> {
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final restaurantProvider = context.read<RestaurantProvider>();
-      restaurantProvider.fetchRestaurants();
+      restaurantProvider.fetchRestaurants().then((_) {
+        if (mounted &&
+            _selectedCategory == DeliveryCategory.food &&
+            restaurantProvider.selectedRestaurant == null &&
+            restaurantProvider.restaurants.isNotEmpty) {
+          restaurantProvider.selectRestaurant(restaurantProvider.restaurants.first).then((_) {
+            if (mounted) _syncFromRestaurantProvider(restaurantProvider);
+          });
+        }
+      });
     });
   }
 
@@ -77,50 +191,14 @@ class _CreateDeliveryScreenState extends State<CreateDeliveryScreen> {
     super.dispose();
   }
 
-  Future<void> _useCurrentGpsForDestination() async {
-    setState(() => _isLocating = true);
-    try {
-      LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-      }
-      if (permission == LocationPermission.deniedForever || permission == LocationPermission.denied) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Location permission denied. Please type your destination.')),
-          );
-        }
-        return;
-      }
-
-      final position = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
-      );
-      if (mounted) {
-        setState(() {
-          _selectedDestLat = position.latitude;
-          _selectedDestLng = position.longitude;
-          _destinationController.text =
-              'GPS Location (${position.latitude.toStringAsFixed(4)}, ${position.longitude.toStringAsFixed(4)})';
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Destination set from your current GPS location! 📍'),
-            backgroundColor: AppColors.success,
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('GPS error: ${e.toString()}')),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _isLocating = false);
-    }
+  void _goToStep(int step) {
+    if (step < 0 || step > 2) return;
+    setState(() => _currentStep = step);
   }
 
+  // ---------------------------------------------------------------------------
+  // Sync Data Helpers
+  // ---------------------------------------------------------------------------
   void _syncFromRestaurantProvider(RestaurantProvider provider) {
     final restaurant = provider.selectedRestaurant;
     final food = provider.selectedFoodItem;
@@ -159,11 +237,20 @@ class _CreateDeliveryScreenState extends State<CreateDeliveryScreen> {
       _selectedCategory = category;
       if (category == DeliveryCategory.food) {
         final restaurantProvider = context.read<RestaurantProvider>();
-        if (restaurantProvider.selectedRestaurant != null) {
+        if (restaurantProvider.restaurants.isEmpty) {
+          restaurantProvider.fetchRestaurants().then((_) {
+            if (mounted && restaurantProvider.restaurants.isNotEmpty && restaurantProvider.selectedRestaurant == null) {
+              restaurantProvider.selectRestaurant(restaurantProvider.restaurants.first).then((_) {
+                if (mounted) _syncFromRestaurantProvider(restaurantProvider);
+              });
+            }
+          });
+        } else if (restaurantProvider.selectedRestaurant == null && restaurantProvider.restaurants.isNotEmpty) {
+          restaurantProvider.selectRestaurant(restaurantProvider.restaurants.first).then((_) {
+            if (mounted) _syncFromRestaurantProvider(restaurantProvider);
+          });
+        } else if (restaurantProvider.selectedRestaurant != null) {
           _syncFromRestaurantProvider(restaurantProvider);
-        } else {
-          _itemDescriptionController.clear();
-          _pickupController.clear();
         }
       } else {
         _itemDescriptionController.clear();
@@ -226,26 +313,99 @@ class _CreateDeliveryScreenState extends State<CreateDeliveryScreen> {
     }
   }
 
-  void _handleContinue() {
+  Future<void> _useCurrentGpsForDestination() async {
+    setState(() => _isLocating = true);
+    try {
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      if (permission == LocationPermission.deniedForever ||
+          permission == LocationPermission.denied) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('Location permission denied. Please enter destination manually.'),
+            ),
+          );
+        }
+        return;
+      }
+
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
+      );
+      if (mounted) {
+        setState(() {
+          _selectedDestLat = position.latitude;
+          _selectedDestLng = position.longitude;
+          _destinationController.text =
+              'GPS Location (${position.latitude.toStringAsFixed(4)}, ${position.longitude.toStringAsFixed(4)})';
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Destination set from your current GPS location! 📍'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('GPS error: ${e.toString()}')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLocating = false);
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Step Navigation Validators
+  // ---------------------------------------------------------------------------
+  void _validateAndProceedFromStep1() {
+    final isFood = _selectedCategory == DeliveryCategory.food;
+    final restaurantProvider = context.read<RestaurantProvider>();
+
+    if (isFood) {
+      if (restaurantProvider.selectedRestaurant == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Please select a partner hotel or restaurant before proceeding.'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+        return;
+      }
+      if (_itemDescriptionController.text.trim().isEmpty) {
+        _itemDescriptionController.text =
+            'Food order from ${restaurantProvider.selectedRestaurant!.name}';
+      }
+    } else {
+      if (_itemDescriptionController.text.trim().isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Please describe the item or package you wish to deliver.'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+        return;
+      }
+    }
+
+    _goToStep(1);
+  }
+
+  void _validateAndProceedFromStep2() {
     final pickup = _pickupController.text.trim();
     final destination = _destinationController.text.trim();
     final itemDescription = _itemDescriptionController.text.trim();
     final instructions = _instructionsController.text.trim();
 
-    if (itemDescription.isEmpty) {
+    if (_selectedCategory == DeliveryCategory.other && pickup.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please select a hotel & food dish, or describe your item.'),
-          backgroundColor: AppColors.error,
-        ),
-      );
-      return;
-    }
-
-    if (pickup.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please select a hotel or enter pickup location.'),
+        SnackBar(
+          content: const Text('Please enter or pick a pickup location on the map.'),
           backgroundColor: AppColors.error,
         ),
       );
@@ -254,8 +414,8 @@ class _CreateDeliveryScreenState extends State<CreateDeliveryScreen> {
 
     if (destination.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Destination is required! Please type destination address or tap "Use GPS".'),
+        SnackBar(
+          content: const Text('Destination is required! Please enter destination or tap "Use GPS".'),
           backgroundColor: AppColors.error,
         ),
       );
@@ -266,7 +426,7 @@ class _CreateDeliveryScreenState extends State<CreateDeliveryScreen> {
     deliveryProvider.setDraftDetails(
       pickup: pickup,
       destination: destination,
-      itemType: _selectedCategory == DeliveryCategory.food ? 'Food & Groceries' : 'Parcel / Box',
+      itemType: _selectedCategory == DeliveryCategory.food ? 'Food & Groceries' : _selectedItemType,
       itemDescription: itemDescription,
       instructions: instructions.isNotEmpty ? instructions : null,
       foodPrice: _selectedFoodPrice,
@@ -278,14 +438,734 @@ class _CreateDeliveryScreenState extends State<CreateDeliveryScreen> {
       destinationLng: _selectedDestLng ?? 39.9880,
     );
 
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => const CheckoutScreen()),
+    _goToStep(2);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Step 3 Checkout Helpers (Payment & Receipt)
+  // ---------------------------------------------------------------------------
+  void _copyToClipboard(String text, String label) {
+    Clipboard.setData(ClipboardData(text: text.replaceAll(' ', '')));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.check_circle, color: Colors.white, size: 18),
+            const SizedBox(width: 8),
+            Expanded(child: Text('$label copied to clipboard!')),
+          ],
+        ),
+        backgroundColor: const Color(0xFF1E293B),
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 2),
+      ),
     );
   }
 
+  void _onSelectPaymentMethod(PaymentAccountInfo account, double totalAmount) {
+    setState(() {
+      _selectedPaymentMethod = account.method;
+    });
+    _showPaymentInstructionDialog(account, totalAmount);
+  }
+
+  void _showPaymentInstructionDialog(PaymentAccountInfo account, double totalAmount) {
+    final currencyFormatter = NumberFormat("#,##0.00", "en_US");
+    final formattedAmount = '${currencyFormatter.format(totalAmount)} Birr';
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        titlePadding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+        contentPadding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+        actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: account.brandBgColor,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: account.brandColor.withValues(alpha: 0.3)),
+              ),
+              child: Icon(account.fallbackIcon, color: account.brandColor, size: 22),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    account.title,
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const Text(
+                    'Manual Transfer Instructions',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                      fontWeight: FontWeight.normal,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Transfer Target Account:',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: AppColors.textMuted,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: SelectableText(
+                          account.accountNumber,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.textPrimary,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.copy_rounded, size: 18, color: AppColors.primary),
+                        tooltip: 'Copy account number',
+                        onPressed: () => _copyToClipboard(account.accountNumber, 'Account number'),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Name: ${account.accountHolder}',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+            RichText(
+              text: TextSpan(
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: AppColors.textPrimary,
+                  height: 1.45,
+                ),
+                children: [
+                  const TextSpan(text: 'Please send '),
+                  TextSpan(
+                    text: formattedAmount,
+                    style: const TextStyle(fontWeight: FontWeight.w800, color: AppColors.primary),
+                  ),
+                  const TextSpan(text: ' to '),
+                  TextSpan(
+                    text: '${account.title} (${account.accountNumber})',
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  const TextSpan(text: ' and upload the transaction receipt below.'),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('OK, Got It', style: TextStyle(fontWeight: FontWeight.w700)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _pickFromCamera() async {
+    setState(() => _isPickingReceipt = true);
+    try {
+      final ImagePicker picker = ImagePicker();
+      final XFile? photo = await picker.pickImage(
+        source: ImageSource.camera,
+        maxWidth: 1600,
+        maxHeight: 1600,
+        imageQuality: 85,
+      );
+
+      if (photo != null) {
+        final bytes = await photo.readAsBytes();
+        await _processPickedFile(photo.name, bytes, filePath: photo.path);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Camera unavailable: $e. Opening gallery instead...'),
+            backgroundColor: const Color(0xFFD97706),
+          ),
+        );
+      }
+      await _pickFromGallery();
+    } finally {
+      if (mounted) setState(() => _isPickingReceipt = false);
+    }
+  }
+
+  Future<void> _pickFromGallery() async {
+    setState(() => _isPickingReceipt = true);
+    try {
+      final ImagePicker picker = ImagePicker();
+      final XFile? image = await picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 1600,
+        maxHeight: 1600,
+        imageQuality: 85,
+      );
+
+      if (image != null) {
+        final bytes = await image.readAsBytes();
+        await _processPickedFile(image.name, bytes, filePath: image.path);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Gallery selection cancelled or error: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isPickingReceipt = false);
+    }
+  }
+
+  Future<void> _processPickedFile(String fileName, Uint8List bytes, {String? filePath}) async {
+    final ext = fileName.contains('.') ? fileName.split('.').last.toLowerCase() : 'jpg';
+    final mimeType = (ext == 'png')
+        ? 'image/png'
+        : (ext == 'webp')
+            ? 'image/webp'
+            : (ext == 'pdf')
+                ? 'application/pdf'
+                : 'image/jpeg';
+
+    final base64String = 'data:$mimeType;base64,${base64Encode(bytes)}';
+
+    final sizeKb = bytes.lengthInBytes / 1024;
+    final sizeStr = sizeKb > 1024
+        ? '${(sizeKb / 1024).toStringAsFixed(2)} MB'
+        : '${sizeKb.toStringAsFixed(1)} KB';
+
+    setState(() {
+      _uploadedReceipt = UploadedReceipt(
+        fileName: fileName,
+        fileSize: sizeStr,
+        uploadedAt: DateFormat('hh:mm a, dd MMM yyyy').format(DateTime.now()),
+        previewType: ext == 'pdf' ? 'PDF' : 'IMAGE',
+        receiptUrl: base64String,
+        fileBytes: bytes,
+        filePath: filePath,
+      );
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text('Receipt attached! Ready to submit.'),
+        backgroundColor: const Color(0xFF16A34A),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  void _showReceiptPreviewDialog() {
+    if (_uploadedReceipt == null) return;
+
+    final selectedMethodTitle = _selectedPaymentMethod != null
+        ? _paymentAccounts.firstWhere((a) => a.method == _selectedPaymentMethod).title
+        : 'Telebirr';
+
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        clipBehavior: Clip.antiAlias,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 500, maxHeight: 600),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+                decoration: const BoxDecoration(
+                  color: Color(0xFFF8FAFC),
+                  border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFEFF6FF),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Icon(Icons.receipt_long_rounded, color: AppColors.primary, size: 18),
+                        ),
+                        const SizedBox(width: 10),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Payment Receipt',
+                              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: AppColors.textPrimary),
+                            ),
+                            Text(
+                              'Target Method: $selectedMethodTitle',
+                              style: const TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close_rounded, size: 20, color: AppColors.textSecondary),
+                      onPressed: () => Navigator.pop(ctx),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                    ),
+                  ],
+                ),
+              ),
+              Flexible(
+                child: Container(
+                  color: const Color(0xFF0F172A),
+                  width: double.infinity,
+                  alignment: Alignment.center,
+                  child: (_uploadedReceipt!.fileBytes != null)
+                      ? InteractiveViewer(
+                          panEnabled: true,
+                          boundaryMargin: const EdgeInsets.all(20),
+                          minScale: 0.8,
+                          maxScale: 4.0,
+                          child: Image.memory(
+                            _uploadedReceipt!.fileBytes!,
+                            fit: BoxFit.contain,
+                          ),
+                        )
+                      : (_uploadedReceipt!.receiptUrl != null &&
+                              _uploadedReceipt!.receiptUrl!.startsWith('http'))
+                          ? InteractiveViewer(
+                              panEnabled: true,
+                              boundaryMargin: const EdgeInsets.all(20),
+                              minScale: 0.8,
+                              maxScale: 4.0,
+                              child: Image.network(
+                                _uploadedReceipt!.receiptUrl!,
+                                fit: BoxFit.contain,
+                              ),
+                            )
+                          : const Center(
+                              child: Text(
+                                'Receipt Document Ready',
+                                style: TextStyle(color: Colors.white70),
+                              ),
+                            ),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  border: Border(top: BorderSide(color: Color(0xFFE2E8F0))),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _uploadedReceipt!.fileName,
+                            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12.5, color: AppColors.textPrimary),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          Text(
+                            '${_uploadedReceipt!.fileSize} • ${_uploadedReceipt!.uploadedAt}',
+                            style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                          ),
+                        ],
+                      ),
+                    ),
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                      onPressed: () => Navigator.pop(ctx),
+                      child: const Text('Done', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _handleSubmitDelivery() async {
+    if (_selectedPaymentMethod == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Please select a payment method (Telebirr, CBE, or Awash Bank).'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+      return;
+    }
+
+    if (_uploadedReceipt == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Please upload your payment receipt before submitting.'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isSubmitting = true);
+
+    try {
+      final deliveryProvider = context.read<DeliveryProvider>();
+      final found = _paymentAccounts.firstWhere((a) => a.method == _selectedPaymentMethod);
+      final paymentMethodName = found.title;
+
+      final receiptUrl = _uploadedReceipt?.receiptUrl ?? '';
+
+      deliveryProvider.draftPaymentMethod = paymentMethodName;
+      deliveryProvider.draftReceiptUrl = receiptUrl;
+
+      final newDelivery = await deliveryProvider.createDeliveryFromDraft();
+
+      if (mounted) {
+        showRequestSubmittedCardPopup(
+          context,
+          deliveryId: newDelivery.id,
+          trackingCode: newDelivery.trackingCode,
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to submit delivery: ${e.toString().replaceAll("Exception: ", "")}'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Build Screen
+  // ---------------------------------------------------------------------------
   @override
   Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF1F5F9),
+      body: SafeArea(
+        child: Column(
+          children: [
+            // Top App Bar (Back navigation + Page Title)
+            _buildTopAppBar(),
+
+            // Screen Top Header: Current Step Title on Left, Step Counter on Top Right
+            _buildStepCounterHeader(),
+
+            // Multi-step Animated Progress Bar (Thickened Line)
+            _buildProgressBar(),
+
+            const SizedBox(height: 8),
+
+            // The Elevated "Big Card" Housing the Current Step
+            if (_currentStep == 0) ...[
+              // Step 1: Big Card comfortably placed below the progress bar
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(14.0, 4.0, 14.0, 16.0),
+                  child: Container(
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      color: Colors.white, // Big card is white
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(color: const Color(0xFFE2E8F0), width: 1.2),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.08),
+                          blurRadius: 22,
+                          offset: const Offset(0, 8),
+                          spreadRadius: 1,
+                        ),
+                        BoxShadow(
+                          color: AppColors.primary.withValues(alpha: 0.04),
+                          blurRadius: 12,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(24),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          _buildStep1ServiceAndDetails(),
+                          _buildBottomActionBar(),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ] else if (_currentStep == 1) ...[
+              // Step 2: Card sized to the form with 4-side padding
+              Flexible(
+                fit: FlexFit.loose,
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(14.0, 4.0, 14.0, 16.0),
+                  child: Container(
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(color: const Color(0xFFE2E8F0), width: 1.2),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.08),
+                          blurRadius: 22,
+                          offset: const Offset(0, 8),
+                          spreadRadius: 1,
+                        ),
+                        BoxShadow(
+                          color: AppColors.primary.withValues(alpha: 0.04),
+                          blurRadius: 12,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(24),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          _buildStep2Locations(),
+                          _buildBottomActionBar(),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ] else ...[
+              // Step 3: Checkout Card with 4-side padding
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(14.0, 4.0, 14.0, 16.0),
+                  child: Container(
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(color: const Color(0xFFE2E8F0), width: 1.2),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.08),
+                          blurRadius: 22,
+                          offset: const Offset(0, 8),
+                          spreadRadius: 1,
+                        ),
+                        BoxShadow(
+                          color: AppColors.primary.withValues(alpha: 0.04),
+                          blurRadius: 12,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(24),
+                      child: Column(
+                        children: [
+                          Expanded(
+                            child: _buildStep3Checkout(),
+                          ),
+                          _buildBottomActionBar(),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Top App Bar (Back Button + Page Title)
+  // ---------------------------------------------------------------------------
+  Widget _buildTopAppBar() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(8.0, 6.0, 16.0, 4.0),
+      child: Row(
+        children: [
+          IconButton(
+            icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20, color: AppColors.textPrimary),
+            onPressed: () {
+              if (_currentStep > 0) {
+                _goToStep(_currentStep - 1);
+              } else {
+                Navigator.pop(context);
+              }
+            },
+          ),
+          const SizedBox(width: 4),
+          const Text(
+            'Request Delivery',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+              color: AppColors.textPrimary,
+              letterSpacing: -0.3,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Screen Top Step Counter Header (Step Counter on Top Right)
+  // ---------------------------------------------------------------------------
+  Widget _buildStepCounterHeader() {
+    final stepTitles = ['Service & Details', 'Pickup & Destination', 'Checkout & Payment'];
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20.0, 2.0, 20.0, 8.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Text(
+            stepTitles[_currentStep],
+            style: const TextStyle(
+              fontSize: 13.5,
+              fontWeight: FontWeight.w700,
+              color: AppColors.textSecondary,
+              letterSpacing: -0.2,
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4.5),
+            decoration: BoxDecoration(
+              color: AppColors.primary.withValues(alpha: 0.10),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppColors.primary.withValues(alpha: 0.22)),
+            ),
+            child: Text(
+              'Step ${_currentStep + 1} of 3',
+              style: const TextStyle(
+                fontSize: 11.5,
+                fontWeight: FontWeight.w800,
+                color: AppColors.primary,
+                letterSpacing: -0.2,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Progress Bar (3 Segments with added thickness)
+  // ---------------------------------------------------------------------------
+  Widget _buildProgressBar() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20.0),
+      child: Row(
+        children: List.generate(3, (index) {
+          final isCompleted = _currentStep > index;
+          final isCurrent = _currentStep == index;
+
+          return Expanded(
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeInOut,
+              height: 7.0,
+              margin: EdgeInsets.only(right: index < 2 ? 8.0 : 0),
+              decoration: BoxDecoration(
+                color: isCompleted || isCurrent ? AppColors.primary : const Color(0xFFCBD5E1),
+                borderRadius: BorderRadius.circular(4.0),
+              ),
+            ),
+          );
+        }),
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // STEP 1: MERGED Service Type (Small Cards) + Order/Food Details
+  // ---------------------------------------------------------------------------
+  Widget _buildStep1ServiceAndDetails() {
     final isFood = _selectedCategory == DeliveryCategory.food;
     final isOther = _selectedCategory == DeliveryCategory.other;
     final restaurantProvider = context.watch<RestaurantProvider>();
@@ -293,246 +1173,454 @@ class _CreateDeliveryScreenState extends State<CreateDeliveryScreen> {
     final selectedFood = restaurantProvider.selectedFoodItem;
     final allHotels = restaurantProvider.restaurants;
 
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: const Text(
-          'Request Delivery',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
-        ),
-        centerTitle: false,
-      ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 8.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+    return Padding(
+      padding: const EdgeInsets.all(18.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Header inside card
+          Row(
             children: [
-              const Text(
-                'Where & What to Deliver',
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.textPrimary,
-                  letterSpacing: -0.3,
+              Container(
+                padding: const EdgeInsets.all(7),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(10),
                 ),
+                child: const Icon(Icons.touch_app_rounded, color: AppColors.primary, size: 18),
               ),
-              const SizedBox(height: 4),
-              const Text(
-                'Choose your category: order delicious meals or send custom items.',
-                style: TextStyle(
-                  fontSize: 13.5,
-                  color: AppColors.textSecondary,
-                ),
-              ),
-              const SizedBox(height: 18),
-
-              // 1. Category Switcher ("Order from Partners" vs "Order Anything")
-              Row(
-                children: [
-                  // Card 1: Order from Partners
-                  Expanded(
-                    child: _buildCategoryCard(
-                      title: 'Order from Partners',
-                      subtitle: 'Hotels & Menus',
-                      icon: Icons.storefront_rounded,
-                      isSelected: isFood,
-                      activeBgColor: const Color(0xFFEFF6FF),
-                      activeBorderColor: AppColors.primary,
-                      activeIconColor: AppColors.primary,
-                      onTap: () => _onCategorySelected(DeliveryCategory.food),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-
-                  // Card 2: Order Anything
-                  Expanded(
-                    child: _buildCategoryCard(
-                      title: 'Order Anything',
-                      subtitle: 'Parcels & custom items',
-                      icon: Icons.inventory_2_rounded,
-                      isSelected: isOther,
-                      activeBgColor: const Color(0xFFEEF2FF),
-                      activeBorderColor: const Color(0xFF4F46E5),
-                      activeIconColor: const Color(0xFF4F46E5),
-                      onTap: () => _onCategorySelected(DeliveryCategory.other),
-                    ),
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 22),
-
-              if (isFood) ...[
-                // --- SECTION: EXPLORE HOTELS & RESTAURANTS ---
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'Explore Hotels & Restaurants',
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: const [
+                    Text(
+                      'Choose Service & Customize Order',
                       style: TextStyle(
-                        fontSize: 15,
+                        fontSize: 16,
                         fontWeight: FontWeight.w800,
                         color: AppColors.textPrimary,
+                        letterSpacing: -0.2,
                       ),
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    if (selectedRestaurant != null)
-                      InkWell(
-                        onTap: () => _openRestaurantPicker(context),
-                        borderRadius: BorderRadius.circular(8),
-                        child: const Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                    Text(
+                      'Select service type and specify what you need',
+                      style: TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 14),
+
+          // 1. SMALL / COMPACT SERVICE TYPE OPTION CARDS (Side by side)
+          Row(
+            children: [
+              // Option 1: Hotels & Food
+              Expanded(
+                child: _buildSmallServiceOptionCard(
+                  title: 'Hotels & Food',
+                  subtitle: 'Hotel menus & fresh meals',
+                  icon: Icons.restaurant_rounded,
+                  isSelected: isFood,
+                  activeColor: AppColors.primary,
+                  onTap: () => _onCategorySelected(DeliveryCategory.food),
+                ),
+              ),
+              const SizedBox(width: 10),
+              // Option 2: Order Anything / Custom
+              Expanded(
+                child: _buildSmallServiceOptionCard(
+                  title: 'Order Anything',
+                  subtitle: 'Parcels, docs & any item',
+                  icon: Icons.inventory_2_rounded,
+                  isSelected: isOther,
+                  activeColor: const Color(0xFF4F46E5),
+                  onTap: () => _onCategorySelected(DeliveryCategory.other),
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 18),
+          const Divider(height: 1, color: Color(0xFFF1F5F9)),
+          const SizedBox(height: 16),
+
+          // 2. ORDER DETAILS (FOOD vs OTHER)
+          if (isFood) ...[
+            // ---------------- FOOD SECTION ----------------
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Text(
+                    'Partner Hotel / Restaurant',
+                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                if (selectedRestaurant != null)
+                  TextButton(
+                    onPressed: () => _openRestaurantPicker(context),
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      visualDensity: VisualDensity.compact,
+                    ),
+                    child: const Text('Change Hotel', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.primary)),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 6),
+
+            if (selectedRestaurant == null) ...[
+              // Select Hotel Card
+              InkWell(
+                onTap: () => _openRestaurantPicker(context),
+                borderRadius: BorderRadius.circular(14),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: const Color(0xFFCBD5E1), width: 1.2),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFEFF6FF),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: const Color(0xFFBFDBFE)),
+                        ),
+                        child: const Icon(Icons.storefront_rounded, color: AppColors.primary, size: 22),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: const [
+                            Text(
+                              'Select Hotel to View Menu',
+                              style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
+                            ),
+                            SizedBox(height: 2),
+                            Text(
+                              'Tap here to browse verified hotels in Bale Robe',
+                              style: TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: AppColors.primary),
+                    ],
+                  ),
+                ),
+              ),
+
+              // Horizontal Popular Hotels List
+              if (allHotels.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                const Text(
+                  'Popular Partner Hotels in Bale:',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.textSecondary),
+                ),
+                const SizedBox(height: 6),
+                SizedBox(
+                  height: 76,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: allHotels.length,
+                    separatorBuilder: (_, __) => const SizedBox(width: 8),
+                    itemBuilder: (context, idx) {
+                      final h = allHotels[idx];
+                      return InkWell(
+                        onTap: () {
+                          restaurantProvider.selectRestaurant(h).then((_) {
+                            if (mounted) _syncFromRestaurantProvider(restaurantProvider);
+                          });
+                        },
+                        borderRadius: BorderRadius.circular(14),
+                        child: Container(
+                          width: 155,
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF8FAFC),
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: const Color(0xFFE2E8F0)),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.02),
+                                blurRadius: 4,
+                                offset: const Offset(0, 1),
+                              ),
+                            ],
+                          ),
                           child: Row(
                             children: [
-                              Icon(Icons.swap_horiz_rounded, size: 16, color: AppColors.primary),
-                              SizedBox(width: 4),
-                              Text(
-                                'Change Hotel',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w700,
-                                  color: AppColors.primary,
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(9),
+                                child: Container(
+                                  width: 38,
+                                  height: 38,
+                                  color: const Color(0xFFE0F2FE),
+                                  child: h.avatar != null && h.avatar!.isNotEmpty
+                                      ? Image.network(
+                                          h.avatar!,
+                                          fit: BoxFit.cover,
+                                          errorBuilder: (_, __, ___) =>
+                                              const Icon(Icons.restaurant_rounded, color: AppColors.primary, size: 20),
+                                        )
+                                      : const Icon(Icons.restaurant_rounded, color: AppColors.primary, size: 20),
+                                ),
+                              ),
+                              const SizedBox(width: 7),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Text(
+                                      h.name,
+                                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Row(
+                                      children: [
+                                        const Icon(Icons.star_rounded, size: 12, color: Color(0xFFEAB308)),
+                                        const SizedBox(width: 2),
+                                        Text('${h.rating}', style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold)),
+                                      ],
+                                    ),
+                                  ],
                                 ),
                               ),
                             ],
                           ),
                         ),
-                      ),
-                  ],
+                      );
+                    },
+                  ),
                 ),
+              ] else if (restaurantProvider.isLoading) ...[
                 const SizedBox(height: 10),
-
-                // State A: When NO hotel is selected yet
-                if (selectedRestaurant == null) ...[
-                  InkWell(
-                    onTap: () => _openRestaurantPicker(context),
-                    borderRadius: BorderRadius.circular(16),
-                    child: Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(18),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF8FAFC),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: const Color(0xFFCBD5E1), width: 1.2),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 14),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: const [
+                      SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
                       ),
-                      child: Row(
+                      SizedBox(width: 8),
+                      Text(
+                        'Connecting to Bale Robe partner hotels...',
+                        style: TextStyle(fontSize: 11.5, color: AppColors.textSecondary, fontWeight: FontWeight.w600),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ] else ...[
+              // Hotel is Selected Card
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: const Color(0xFFCBD5E1), width: 1.2),
+                ),
+                child: Row(
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Container(
+                        width: 42,
+                        height: 42,
+                        color: const Color(0xFFE0F2FE),
+                        child: selectedRestaurant.avatar != null && selectedRestaurant.avatar!.isNotEmpty
+                            ? Image.network(
+                                selectedRestaurant.avatar!,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) =>
+                                    const Icon(Icons.restaurant_rounded, color: AppColors.primary, size: 22),
+                              )
+                            : const Icon(Icons.restaurant_rounded, color: AppColors.primary, size: 22),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFEFF6FF),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: const Color(0xFFBFDBFE)),
-                            ),
-                            child: const Icon(Icons.storefront_rounded, color: AppColors.primary, size: 26),
-                          ),
-                          const SizedBox(width: 14),
-                          const Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Select a Hotel to View Menu',
-                                  style: TextStyle(
-                                    fontSize: 14.5,
-                                    fontWeight: FontWeight.w800,
-                                    color: AppColors.textPrimary,
-                                  ),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  selectedRestaurant.name,
+                                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
+                                  overflow: TextOverflow.ellipsis,
                                 ),
-                                SizedBox(height: 3),
-                                Text(
-                                  'Tap here to browse all verified partner hotels in Bale Robe',
-                                  style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFE0F2FE),
+                                  borderRadius: BorderRadius.circular(5),
                                 ),
-                              ],
-                            ),
+                                child: const Text(
+                                  'Verified',
+                                  style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: AppColors.primary),
+                                ),
+                              ),
+                            ],
                           ),
-                          const Icon(Icons.arrow_forward_ios_rounded, size: 16, color: AppColors.primary),
+                          Text(
+                            selectedRestaurant.address,
+                            style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ],
                       ),
                     ),
-                  ),
+                  ],
+                ),
+              ),
+            ],
 
-                  // Horizontal Quick Hotel Explorer List
-                  if (allHotels.isNotEmpty) ...[
-                    const SizedBox(height: 14),
-                    const Text(
-                      'Popular Hotels in Bale Robe:',
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.textSecondary),
+            const SizedBox(height: 14),
+
+            // Food Dishes Menu
+            if (selectedRestaurant != null) ...[
+              const Text(
+                'Select Food Dish:',
+                style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
+              ),
+              const SizedBox(height: 6),
+
+              if (restaurantProvider.isLoadingMenu) ...[
+                const Center(child: Padding(padding: EdgeInsets.all(16), child: CircularProgressIndicator())),
+              ] else if (selectedRestaurant.foods.isNotEmpty) ...[
+                // Search food item
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: TextField(
+                    controller: _foodSearchController,
+                    onChanged: (val) => setState(() {}),
+                    decoration: InputDecoration(
+                      hintText: 'Search dishes in ${selectedRestaurant.name}...',
+                      hintStyle: const TextStyle(fontSize: 11.5, color: AppColors.textMuted),
+                      prefixIcon: const Icon(Icons.search, size: 16, color: AppColors.textSecondary),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      filled: true,
+                      fillColor: const Color(0xFFF8FAFC),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
                     ),
-                    const SizedBox(height: 8),
-                    SizedBox(
-                      height: 86,
+                  ),
+                ),
+
+                // Horizontal Dishes List
+                Builder(
+                  builder: (context) {
+                    final query = _foodSearchController.text.trim().toLowerCase();
+                    final filteredFoods = selectedRestaurant.foods.where((f) {
+                      if (query.isEmpty) return true;
+                      return f.name.toLowerCase().contains(query);
+                    }).toList();
+
+                    return SizedBox(
+                      height: 154,
                       child: ListView.separated(
                         scrollDirection: Axis.horizontal,
-                        itemCount: allHotels.length,
-                        separatorBuilder: (_, __) => const SizedBox(width: 10),
+                        itemCount: filteredFoods.length,
+                        separatorBuilder: (_, __) => const SizedBox(width: 8),
                         itemBuilder: (context, idx) {
-                          final h = allHotels[idx];
+                          final food = filteredFoods[idx];
+                          final isSelected = selectedFood?.id == food.id;
+
                           return InkWell(
-                            onTap: () {
-                              restaurantProvider.selectRestaurant(h).then((_) {
-                                if (mounted) _syncFromRestaurantProvider(restaurantProvider);
-                              });
-                            },
+                            onTap: () => _onFoodItemSelected(food),
                             borderRadius: BorderRadius.circular(12),
                             child: Container(
-                              width: 160,
-                              padding: const EdgeInsets.all(10),
+                              width: 124,
+                              padding: const EdgeInsets.all(6),
                               decoration: BoxDecoration(
-                                color: Colors.white,
+                                color: isSelected ? const Color(0xFFEFF6FF) : const Color(0xFFF8FAFC),
                                 borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: const Color(0xFFE2E8F0)),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withValues(alpha: 0.03),
-                                    blurRadius: 6,
-                                    offset: const Offset(0, 2),
-                                  ),
-                                ],
+                                border: Border.all(
+                                  color: isSelected ? AppColors.primary : const Color(0xFFE2E8F0),
+                                  width: isSelected ? 2.0 : 1.0,
+                                ),
                               ),
-                              child: Row(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
-                                  ClipRRect(
-                                    borderRadius: BorderRadius.circular(8),
-                                    child: Container(
-                                      width: 40,
-                                      height: 40,
-                                      color: const Color(0xFFE0F2FE),
-                                      child: h.avatar != null && h.avatar!.isNotEmpty
-                                          ? Image.network(
-                                              h.avatar!,
-                                              fit: BoxFit.cover,
-                                              errorBuilder: (_, __, ___) => const Icon(Icons.restaurant_rounded, color: AppColors.primary, size: 20),
-                                            )
-                                          : const Icon(Icons.restaurant_rounded, color: AppColors.primary, size: 20),
-                                    ),
+                                  Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      ClipRRect(
+                                        borderRadius: BorderRadius.circular(7),
+                                        child: Container(
+                                          height: 56,
+                                          width: double.infinity,
+                                          color: const Color(0xFFF1F5F9),
+                                          child: food.image != null && food.image!.isNotEmpty
+                                              ? Image.network(
+                                                  food.image!,
+                                                  fit: BoxFit.cover,
+                                                  errorBuilder: (_, __, ___) =>
+                                                      const Icon(Icons.fastfood_rounded, color: AppColors.textMuted, size: 22),
+                                                )
+                                              : const Icon(Icons.fastfood_rounded, color: AppColors.textMuted, size: 22),
+                                        ),
+                                      ),
+                                      const SizedBox(height: 5),
+                                      Text(
+                                        food.name,
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w800,
+                                          color: isSelected ? AppColors.primary : AppColors.textPrimary,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      Text(
+                                        '${food.price.toStringAsFixed(0)} Birr',
+                                        style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w800, color: Color(0xFF16A34A)),
+                                      ),
+                                    ],
                                   ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      mainAxisAlignment: MainAxisAlignment.center,
-                                      children: [
-                                        Text(
-                                          h.name,
-                                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                        const SizedBox(height: 2),
-                                        Row(
-                                          children: [
-                                            const Icon(Icons.star_rounded, size: 12, color: Color(0xFFEAB308)),
-                                            const SizedBox(width: 2),
-                                            Text('${h.rating}', style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold)),
-                                          ],
-                                        ),
-                                      ],
+                                  Container(
+                                    width: double.infinity,
+                                    padding: const EdgeInsets.symmetric(vertical: 3),
+                                    decoration: BoxDecoration(
+                                      color: isSelected ? AppColors.primary : const Color(0xFFF1F5F9),
+                                      borderRadius: BorderRadius.circular(5),
+                                    ),
+                                    alignment: Alignment.center,
+                                    child: Text(
+                                      isSelected ? 'Selected ✓' : 'Select Dish',
+                                      style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w700, color: isSelected ? Colors.white : AppColors.textPrimary),
                                     ),
                                   ),
                                 ],
@@ -541,762 +1629,943 @@ class _CreateDeliveryScreenState extends State<CreateDeliveryScreen> {
                           );
                         },
                       ),
-                    ),
-                  ],
-                ] else ...[
-                  // State B: When a hotel is selected
-                  InkWell(
-                    onTap: () => _openRestaurantPicker(context),
-                    borderRadius: BorderRadius.circular(18),
-                    child: Container(
-                      width: double.infinity,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(18),
-                        border: Border.all(color: const Color(0xFFBAE6FD), width: 1.2),
-                        boxShadow: [
-                          BoxShadow(
-                            color: const Color(0xFF0284C7).withValues(alpha: 0.08),
-                            blurRadius: 12,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // Partner Cover Image Banner (Matching Admin Cover)
-                          PartnerCoverImage(
-                            bannerUrl: selectedRestaurant.banner,
-                            height: 90,
-                            borderRadius: const BorderRadius.vertical(top: Radius.circular(17)),
-                          ),
-
-                          // Partner details row
-                          Padding(
-                            padding: const EdgeInsets.all(14),
-                            child: Row(
-                              children: [
-                                ClipRRect(
-                                  borderRadius: BorderRadius.circular(12),
-                                  child: Container(
-                                    width: 46,
-                                    height: 46,
-                                    color: const Color(0xFFE0F2FE),
-                                    child: selectedRestaurant.avatar != null && selectedRestaurant.avatar!.isNotEmpty
-                                        ? Image.network(
-                                            selectedRestaurant.avatar!,
-                                            fit: BoxFit.cover,
-                                            errorBuilder: (_, __, ___) => const Icon(Icons.restaurant_rounded, color: AppColors.primary, size: 24),
-                                          )
-                                        : const Icon(Icons.restaurant_rounded, color: AppColors.primary, size: 24),
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Row(
-                                        children: [
-                                          Expanded(
-                                            child: Text(
-                                              selectedRestaurant.name,
-                                              style: const TextStyle(
-                                                fontSize: 14.5,
-                                                fontWeight: FontWeight.w800,
-                                                color: AppColors.textPrimary,
-                                              ),
-                                              overflow: TextOverflow.ellipsis,
-                                            ),
-                                          ),
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                            decoration: BoxDecoration(
-                                              color: const Color(0xFFE0F2FE),
-                                              borderRadius: BorderRadius.circular(6),
-                                            ),
-                                            child: const Text(
-                                              'Verified Partner',
-                                              style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: AppColors.primary),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 3),
-                                      Text(
-                                        selectedRestaurant.address,
-                                        style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Row(
-                                        children: [
-                                          const Icon(Icons.access_time_rounded, size: 13, color: AppColors.textSecondary),
-                                          const SizedBox(width: 3),
-                                          Text(
-                                            selectedRestaurant.deliveryTime,
-                                            style: const TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
-                                          ),
-                                          const SizedBox(width: 10),
-                                          const Icon(Icons.menu_book_rounded, size: 13, color: AppColors.textSecondary),
-                                          const SizedBox(width: 3),
-                                          Text(
-                                            '${selectedRestaurant.foods.length} items',
-                                            style: const TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
-                                          ),
-                                        ],
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                const Icon(Icons.chevron_right_rounded, color: AppColors.primary, size: 20),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-
-                const SizedBox(height: 20),
-
-                // --- SECTION: SELECT FOOD DISH & PRICE ---
-                const Text(
-                  'Select Food Dish & Price',
-                  style: TextStyle(
-                    fontSize: 14.5,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.textPrimary,
-                  ),
+                    );
+                  },
                 ),
-                const SizedBox(height: 8),
 
-                if (selectedRestaurant == null) ...[
-                  // Empty state when no hotel is selected yet
+                if (selectedFood != null) ...[
+                  const SizedBox(height: 8),
                   Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
                       color: const Color(0xFFF8FAFC),
-                      borderRadius: BorderRadius.circular(14),
+                      borderRadius: BorderRadius.circular(10),
                       border: Border.all(color: const Color(0xFFE2E8F0)),
                     ),
-                    child: const Row(
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Icon(Icons.info_outline_rounded, color: AppColors.textSecondary, size: 20),
-                        SizedBox(width: 10),
                         Expanded(
                           child: Text(
-                            'Please select a hotel above to view and choose from its food menu.',
-                            style: TextStyle(fontSize: 12.5, color: AppColors.textSecondary, height: 1.3),
+                            'Portions: ${restaurantProvider.selectedQuantity} (${(_selectedFoodPrice ?? 0).toStringAsFixed(0)} Birr)',
+                            style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+                            overflow: TextOverflow.ellipsis,
                           ),
+                        ),
+                        Row(
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.remove_circle_outline_rounded, size: 20, color: AppColors.primary),
+                              onPressed: () {
+                                restaurantProvider.decrementQuantity();
+                                _syncFromRestaurantProvider(restaurantProvider);
+                              },
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(),
+                            ),
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 8),
+                              child: Text(
+                                '${restaurantProvider.selectedQuantity}',
+                                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
+                              ),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.add_circle_rounded, size: 20, color: AppColors.primary),
+                              onPressed: () {
+                                restaurantProvider.incrementQuantity();
+                                _syncFromRestaurantProvider(restaurantProvider);
+                              },
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(),
+                            ),
+                          ],
                         ),
                       ],
                     ),
                   ),
-                ] else if (restaurantProvider.isLoadingMenu) ...[
-                  Container(
-                    height: 100,
-                    alignment: Alignment.center,
-                    child: const CircularProgressIndicator(color: AppColors.primary),
-                  ),
-                ] else if (selectedRestaurant.foods.isNotEmpty) ...[
-                  // Item Search Box (Requirement 8)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: TextField(
-                      controller: _foodSearchController,
-                      onChanged: (val) => setState(() {}),
-                      decoration: InputDecoration(
-                        hintText: 'Search items in ${selectedRestaurant.name}...',
-                        hintStyle: const TextStyle(fontSize: 12.5, color: AppColors.textMuted),
-                        prefixIcon: const Icon(Icons.search, size: 18, color: AppColors.textSecondary),
-                        suffixIcon: _foodSearchController.text.isNotEmpty
-                            ? IconButton(
-                                icon: const Icon(Icons.clear, size: 16),
-                                onPressed: () {
-                                  _foodSearchController.clear();
-                                  setState(() {});
-                                },
-                              )
-                            : null,
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                        filled: true,
-                        fillColor: const Color(0xFFF8FAFC),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-                        ),
-                      ),
-                    ),
-                  ),
-
-                  // Food Dishes List for Selected Hotel
-                  Builder(
-                    builder: (context) {
-                      final query = _foodSearchController.text.trim().toLowerCase();
-                      final filteredFoods = selectedRestaurant.foods.where((f) {
-                        if (query.isEmpty) return true;
-                        return f.name.toLowerCase().contains(query) ||
-                            (f.description != null && f.description!.toLowerCase().contains(query));
-                      }).toList();
-
-                      if (filteredFoods.isEmpty) {
-                        return Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFF8FAFC),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: const Color(0xFFE2E8F0)),
-                          ),
-                          child: Text(
-                            'No dishes match "$query" in this hotel.',
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(fontSize: 12.5, color: AppColors.textSecondary),
-                          ),
-                        );
-                      }
-
-                      return SizedBox(
-                        height: 172,
-                        child: ListView.separated(
-                          scrollDirection: Axis.horizontal,
-                          itemCount: filteredFoods.length,
-                          separatorBuilder: (_, __) => const SizedBox(width: 10),
-                          itemBuilder: (context, idx) {
-                            final food = filteredFoods[idx];
-                            final isSelected = selectedFood?.id == food.id;
-
-                        return InkWell(
-                          onTap: () => _onFoodItemSelected(food),
-                          borderRadius: BorderRadius.circular(14),
-                          child: Container(
-                            width: 140,
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: isSelected ? const Color(0xFFEFF6FF) : Colors.white,
-                              borderRadius: BorderRadius.circular(14),
-                              border: Border.all(
-                                color: isSelected ? AppColors.primary : const Color(0xFFE2E8F0),
-                                width: isSelected ? 2.0 : 1.0,
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: isSelected
-                                      ? AppColors.primary.withValues(alpha: 0.12)
-                                      : Colors.black.withValues(alpha: 0.03),
-                                  blurRadius: 8,
-                                  offset: const Offset(0, 3),
-                                ),
-                              ],
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Stack(
-                                  children: [
-                                    ClipRRect(
-                                      borderRadius: BorderRadius.circular(10),
-                                      child: Container(
-                                        height: 72,
-                                        width: double.infinity,
-                                        color: const Color(0xFFF1F5F9),
-                                        child: food.image != null && food.image!.isNotEmpty
-                                            ? Image.network(
-                                                food.image!,
-                                                fit: BoxFit.cover,
-                                                errorBuilder: (_, __, ___) => const Icon(Icons.fastfood_rounded, color: AppColors.textMuted, size: 28),
-                                              )
-                                            : const Icon(Icons.fastfood_rounded, color: AppColors.textMuted, size: 28),
-                                      ),
-                                    ),
-                                    if (food.tag != null && food.tag!.isNotEmpty)
-                                      Positioned(
-                                        top: 4,
-                                        left: 4,
-                                        child: Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                                          decoration: BoxDecoration(
-                                            color: const Color(0xFFD97706),
-                                            borderRadius: BorderRadius.circular(4),
-                                          ),
-                                          child: Text(
-                                            food.tag!,
-                                            style: const TextStyle(fontSize: 8.5, fontWeight: FontWeight.bold, color: Colors.white),
-                                          ),
-                                        ),
-                                      ),
-                                    if (isSelected)
-                                      Positioned(
-                                        top: 4,
-                                        right: 4,
-                                        child: Container(
-                                          decoration: const BoxDecoration(
-                                            color: AppColors.primary,
-                                            shape: BoxShape.circle,
-                                          ),
-                                          child: const Icon(Icons.check_circle_rounded, color: Colors.white, size: 18),
-                                        ),
-                                      ),
-                                  ],
-                                ),
-                                const SizedBox(height: 6),
-                                Text(
-                                  food.name,
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w800,
-                                    color: isSelected ? AppColors.primary : AppColors.textPrimary,
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  '${food.price.toStringAsFixed(0)} Birr',
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w800,
-                                    color: Color(0xFF16A34A),
-                                  ),
-                                ),
-                                const Spacer(),
-                                Container(
-                                  width: double.infinity,
-                                  padding: const EdgeInsets.symmetric(vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: isSelected ? AppColors.primary : const Color(0xFFF1F5F9),
-                                    borderRadius: BorderRadius.circular(6),
-                                  ),
-                                  alignment: Alignment.center,
-                                  child: Text(
-                                    isSelected ? 'Selected ✓' : 'Select Dish',
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w700,
-                                      color: isSelected ? Colors.white : AppColors.textPrimary,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  );
-                },
-              ),
-
-                  // Quantity Selector for Selected Dish
-                  if (selectedFood != null) ...[
-                    const SizedBox(height: 12),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF8FAFC),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: const Color(0xFFE2E8F0)),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Portion: ${selectedFood.name}',
-                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
-                              ),
-                              Text(
-                                '${selectedFood.price.toStringAsFixed(0)} Birr × ${restaurantProvider.selectedQuantity} = ${(selectedFood.price * restaurantProvider.selectedQuantity).toStringAsFixed(0)} Birr',
-                                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF16A34A)),
-                              ),
-                            ],
-                          ),
-                          Row(
-                            children: [
-                              IconButton(
-                                icon: const Icon(Icons.remove_circle_outline_rounded, size: 22, color: AppColors.primary),
-                                onPressed: () {
-                                  restaurantProvider.decrementQuantity();
-                                  _syncFromRestaurantProvider(restaurantProvider);
-                                },
-                                padding: EdgeInsets.zero,
-                                constraints: const BoxConstraints(),
-                              ),
-                              Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 10),
-                                child: Text(
-                                  '${restaurantProvider.selectedQuantity}',
-                                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
-                                ),
-                              ),
-                              IconButton(
-                                icon: const Icon(Icons.add_circle_rounded, size: 22, color: AppColors.primary),
-                                onPressed: () {
-                                  restaurantProvider.incrementQuantity();
-                                  _syncFromRestaurantProvider(restaurantProvider);
-                                },
-                                padding: EdgeInsets.zero,
-                                constraints: const BoxConstraints(),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
                 ],
               ],
-
-              const SizedBox(height: 22),
-
-              // Item Description (Shown only when ordering custom items from "Order Anything")
-              if (!(isFood && selectedRestaurant != null)) ...[
-                const SizedBox(height: 18),
-                const Row(
-                  children: [
-                    Text(
-                      'Item Description',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                    SizedBox(width: 4),
-                    Text(
-                      '*',
-                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.error),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                TextField(
-                  controller: _itemDescriptionController,
-                  maxLines: 2,
-                  decoration: InputDecoration(
-                    hintText: 'Describe your item (e.g. Documents, Laptop, Keys, Clothes, Special meal)',
-                    hintStyle: const TextStyle(fontSize: 13, color: AppColors.textMuted),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
-                    ),
-                  ),
-                ),
-              ],
-
-              const SizedBox(height: 18),
-
-              // Delivery Instructions (Optional)
-              const Text(
-                'Delivery Instructions (Optional)',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-              const SizedBox(height: 6),
-              TextField(
-                controller: _instructionsController,
-                maxLines: 2,
-                decoration: InputDecoration(
-                  hintText: 'Any special instructions (e.g. Extra chili sauce, call upon arrival, leave at door)',
-                  hintStyle: const TextStyle(fontSize: 13, color: AppColors.textMuted),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
-                  ),
-                ),
-              ),
-
-              // Pickup Location (Requirement 2: REMOVED when customer picks a restaurant)
-              if (!(isFood && selectedRestaurant != null)) ...[
-                const SizedBox(height: 18),
-                const Row(
-                  children: [
-                    Text(
-                      'Pickup Location',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                    SizedBox(width: 4),
-                    Text(
-                      '*',
-                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.error),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                TextField(
-                  controller: _pickupController,
-                  decoration: InputDecoration(
-                    hintText: 'Enter pickup address (or pick on map)',
-                    hintStyle: const TextStyle(fontSize: 13, color: AppColors.textMuted),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
-                    ),
-                    suffixIcon: IconButton(
-                      icon: const Icon(Icons.map_outlined, color: AppColors.primary),
-                      tooltip: 'Pick on map',
-                      onPressed: _openPickupPicker,
-                    ),
-                  ),
-                ),
-              ],
-
-              const SizedBox(height: 18),
-
-              // Destination * (Requirement 1: Required, phone GPS or type manually)
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Row(
-                    children: [
-                      Text(
-                        'Destination',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.textPrimary,
-                        ),
-                      ),
-                      SizedBox(width: 4),
-                      Text(
-                        '* (Required)',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.error,
-                        ),
-                      ),
-                    ],
-                  ),
-                  InkWell(
-                    onTap: _isLocating ? null : _useCurrentGpsForDestination,
-                    borderRadius: BorderRadius.circular(6),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      child: Row(
-                        children: [
-                          if (_isLocating)
-                            const SizedBox(
-                              width: 12,
-                              height: 12,
-                              child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
-                            )
-                          else
-                            const Icon(Icons.my_location_rounded, size: 14, color: AppColors.primary),
-                          const SizedBox(width: 4),
-                          const Text(
-                            'Use GPS',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.primary,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 6),
-              TextField(
-                controller: _destinationController,
-                decoration: InputDecoration(
-                  hintText: 'Enter destination address (or tap GPS)',
-                  hintStyle: const TextStyle(fontSize: 13, color: AppColors.textMuted),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
-                  ),
-                  suffixIcon: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                        icon: const Icon(Icons.my_location_rounded, color: AppColors.primary),
-                        tooltip: 'Use current GPS location',
-                        onPressed: _useCurrentGpsForDestination,
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.map_outlined, color: AppColors.primary),
-                        tooltip: 'Pick on map',
-                        onPressed: _openDestinationPicker,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 28),
-
-              // 6. Continue to Checkout Button
-              CustomButton(
-                text: 'Continue to Checkout',
-                onPressed: _handleContinue,
-              ),
-
-              const SizedBox(height: 12),
-
-              Center(
-                child: TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text(
-                    'Cancel',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
             ],
+          ] else ...[
+            // ---------------- ORDER ANYTHING SECTION ----------------
+            const Text(
+              'Item Category:',
+              style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
+            ),
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: AppConstants.itemTypes.map((type) {
+                final isSelected = _selectedItemType == type;
+                return ChoiceChip(
+                  label: Text(type),
+                  selected: isSelected,
+                  onSelected: (val) {
+                    if (val) setState(() => _selectedItemType = type);
+                  },
+                  selectedColor: AppColors.primary.withValues(alpha: 0.12),
+                  labelStyle: TextStyle(
+                    fontSize: 11,
+                    fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                    color: isSelected ? AppColors.primary : AppColors.textSecondary,
+                  ),
+                  visualDensity: VisualDensity.compact,
+                );
+              }).toList(),
+            ),
+
+            const SizedBox(height: 12),
+
+            const Text(
+              'Item Description *',
+              style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
+            ),
+            const SizedBox(height: 5),
+            TextField(
+              controller: _itemDescriptionController,
+              maxLines: 2,
+              decoration: InputDecoration(
+                hintText: 'What are you sending? (e.g. Laptop, legal documents, store purchase, keys)',
+                hintStyle: const TextStyle(fontSize: 11.5, color: AppColors.textMuted),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                filled: true,
+                fillColor: const Color(0xFFF8FAFC),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+              ),
+            ),
+          ],
+
+          const SizedBox(height: 14),
+
+          // Delivery Instructions
+          const Text(
+            'Delivery Instructions (Optional):',
+            style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
           ),
-        ),
+          const SizedBox(height: 5),
+          TextField(
+            controller: _instructionsController,
+            maxLines: 2,
+            decoration: InputDecoration(
+              hintText: 'Add special notes (e.g. Call before arrival, handle with care, leave at front gate)',
+              hintStyle: const TextStyle(fontSize: 11.5, color: AppColors.textMuted),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              filled: true,
+              fillColor: const Color(0xFFF8FAFC),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+            ),
+          ),
+          const SizedBox(height: 4),
+        ],
       ),
     );
   }
 
-  Widget _buildCategoryCard({
+  // Service Option Card (Top of Step 1)
+  Widget _buildSmallServiceOptionCard({
     required String title,
     required String subtitle,
     required IconData icon,
     required bool isSelected,
-    required Color activeBgColor,
-    required Color activeBorderColor,
-    required Color activeIconColor,
+    required Color activeColor,
     required VoidCallback onTap,
   }) {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(16),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 13),
         decoration: BoxDecoration(
-          color: isSelected ? activeBgColor : const Color(0xFFF8FAFC),
+          color: isSelected ? activeColor.withValues(alpha: 0.08) : const Color(0xFFF8FAFC),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: isSelected ? activeBorderColor : const Color(0xFFE2E8F0),
-            width: isSelected ? 2.0 : 1.0,
+            color: isSelected ? activeColor : const Color(0xFFE2E8F0),
+            width: isSelected ? 1.8 : 1.2,
           ),
           boxShadow: isSelected
               ? [
                   BoxShadow(
-                    color: activeBorderColor.withValues(alpha: 0.14),
+                    color: activeColor.withValues(alpha: 0.12),
                     blurRadius: 10,
-                    offset: const Offset(0, 4),
+                    offset: const Offset(0, 3),
                   ),
                 ]
-              : null,
+              : [],
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        child: Row(
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(7),
-                  decoration: BoxDecoration(
-                    color: isSelected ? Colors.white : const Color(0xFFF1F5F9),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: isSelected ? activeBorderColor.withValues(alpha: 0.3) : const Color(0xFFE2E8F0),
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: isSelected ? Colors.white : const Color(0xFFEFF6FF),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon, color: isSelected ? activeColor : AppColors.textSecondary, size: 20),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                      color: isSelected ? AppColors.textPrimary : const Color(0xFF334155),
+                      letterSpacing: -0.2,
                     ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  child: Icon(
-                    icon,
-                    size: 20,
-                    color: isSelected ? activeIconColor : AppColors.textSecondary,
+                  const SizedBox(height: 1),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(fontSize: 10.5, color: AppColors.textSecondary),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                ),
-                Icon(
-                  isSelected ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
-                  size: 20,
-                  color: isSelected ? activeBorderColor : const Color(0xFFCBD5E1),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Text(
-              title,
-              style: TextStyle(
-                fontSize: 14.5,
-                fontWeight: FontWeight.w800,
-                color: isSelected ? AppColors.textPrimary : AppColors.textPrimary.withValues(alpha: 0.8),
+                ],
               ),
             ),
-            const SizedBox(height: 2),
-            Text(
-              subtitle,
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-                color: isSelected ? activeIconColor : AppColors.textMuted,
-              ),
+            Icon(
+              isSelected ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
+              color: isSelected ? activeColor : const Color(0xFFCBD5E1),
+              size: 18,
             ),
           ],
         ),
       ),
     );
   }
+
+  // ---------------------------------------------------------------------------
+  // STEP 2: Pickup Location & Destination
+  // ---------------------------------------------------------------------------
+  Widget _buildStep2Locations() {
+    final isFood = _selectedCategory == DeliveryCategory.food;
+    final restaurantProvider = context.watch<RestaurantProvider>();
+    final selectedRestaurant = restaurantProvider.selectedRestaurant;
+
+    return Padding(
+      padding: const EdgeInsets.all(18.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.location_on_rounded, color: AppColors.primary, size: 16),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: const [
+                    Text(
+                      'Pickup & Destination Locations',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.textPrimary,
+                        letterSpacing: -0.2,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    Text(
+                      'Set where the rider collects and delivers your order',
+                      style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 12),
+
+          // 1. PICKUP LOCATION
+          if (isFood && selectedRestaurant != null) ...[
+            // Automatic Hotel Pickup Point (tight wrap around text only)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF0FDF4),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFF86EFAC), width: 1.0),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFDCFCE7),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: const Icon(Icons.storefront_rounded, color: Color(0xFF16A34A), size: 16),
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          'Automated Hotel Pickup Point',
+                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Color(0xFF166534)),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF16A34A),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: const Text('Direct Pickup', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.white)),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 5),
+                  Text(
+                    selectedRestaurant.name,
+                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
+                  ),
+                  Text(
+                    selectedRestaurant.address,
+                    style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                  ),
+                  const SizedBox(height: 3),
+                  const Text(
+                    '✓ Rider collects directly from hotel kitchen when prepared.',
+                    style: TextStyle(fontSize: 10.5, color: Color(0xFF16A34A), fontWeight: FontWeight.w600),
+                  ),
+                ],
+              ),
+            ),
+          ] else ...[
+            // Customer Custom Pickup Location
+            const Text(
+              'Pickup Location *',
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
+            ),
+            const SizedBox(height: 4),
+            TextField(
+              controller: _pickupController,
+              decoration: InputDecoration(
+                hintText: 'Enter pickup address in Bale Robe',
+                hintStyle: const TextStyle(fontSize: 11.5, color: AppColors.textMuted),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                filled: true,
+                fillColor: const Color(0xFFF8FAFC),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                suffixIcon: IconButton(
+                  icon: const Icon(Icons.map_outlined, color: AppColors.primary, size: 18),
+                  tooltip: 'Pick on map',
+                  onPressed: _openPickupPicker,
+                ),
+              ),
+            ),
+          ],
+
+          const SizedBox(height: 10),
+
+          // 2. DESTINATION LOCATION
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Text(
+                  'Destination Address * (Required)',
+                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: 6),
+              InkWell(
+                onTap: _isLocating ? null : _useCurrentGpsForDestination,
+                borderRadius: BorderRadius.circular(6),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                  child: Row(
+                    children: [
+                      if (_isLocating)
+                        const SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary))
+                      else
+                        const Icon(Icons.my_location_rounded, size: 13, color: AppColors.primary),
+                      const SizedBox(width: 4),
+                      const Text(
+                        'Use GPS',
+                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.primary),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          TextField(
+            controller: _destinationController,
+            decoration: InputDecoration(
+              hintText: 'Enter destination address (or tap GPS)',
+              hintStyle: const TextStyle(fontSize: 11.5, color: AppColors.textMuted),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              filled: true,
+              fillColor: const Color(0xFFF8FAFC),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+              suffixIcon: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.my_location_rounded, color: AppColors.primary, size: 18),
+                    tooltip: 'Use current GPS location',
+                    onPressed: _useCurrentGpsForDestination,
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.map_outlined, color: AppColors.primary, size: 18),
+                    tooltip: 'Pick on map',
+                    onPressed: _openDestinationPicker,
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 10),
+
+          // Route & Item Summary Badge (tight wrap around text only)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.local_shipping_rounded, color: AppColors.primary, size: 16),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        isFood ? 'Food Delivery' : 'Custom Courier Dispatch',
+                        style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEFF6FF),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: const Text('Bale Direct', style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: AppColors.primary)),
+                    ),
+                  ],
+                ),
+                if (_selectedFoodPrice != null && _selectedFoodPrice! > 0) ...[
+                  const Divider(height: 10, color: Color(0xFFE2E8F0)),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'Food Items Subtotal:',
+                          style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      Text(
+                        '${_selectedFoodPrice!.toStringAsFixed(0)} Birr',
+                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Color(0xFF16A34A)),
+                      ),
+                    ],
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(height: 6),
+        ],
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // STEP 3: CHECKOUT CARD (The Final Step!)
+  // Order & Delivery Details card is REMOVED as explicitly requested.
+  // ---------------------------------------------------------------------------
+  Widget _buildStep3Checkout() {
+    final deliveryProvider = context.watch<DeliveryProvider>();
+    final isFood = _selectedCategory == DeliveryCategory.food ||
+        deliveryProvider.draftItemType == 'Food & Groceries';
+
+    final double foodPrice = isFood ? (_selectedFoodPrice ?? deliveryProvider.draftFoodPrice ?? 0.00) : 0.00;
+    final double deliveryFee = isFood ? 100.00 : 120.00;
+    final double serviceFee = isFood ? 20.00 : 0.00;
+    final double totalPrice = foodPrice + deliveryFee + serviceFee;
+    final currencyFormatter = NumberFormat("#,##0.00", "en_US");
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(18.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header inside card
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(7),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.receipt_long_rounded, color: AppColors.primary, size: 18),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: const [
+                    Text(
+                      'Checkout & Payment',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.textPrimary,
+                        letterSpacing: -0.2,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    Text(
+                      'Choose payment method & attach transaction receipt',
+                      style: TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 14),
+
+          // 1. POS INVOICE / PRICE BREAKDOWN CARD
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.02),
+                  blurRadius: 6,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Row(
+                  children: [
+                    Icon(Icons.point_of_sale_rounded, size: 16, color: AppColors.primary),
+                    SizedBox(width: 6),
+                    Text(
+                      'Price Breakdown & POS Invoice',
+                      style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+
+                if (foodPrice > 0) ...[
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Food Items Subtotal', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                      Text('${currencyFormatter.format(foodPrice)} Birr', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                ],
+
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Delivery Fee (Bale direct)', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                    Text('${currencyFormatter.format(deliveryFee)} Birr', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                  ],
+                ),
+                const SizedBox(height: 6),
+
+                if (serviceFee > 0) ...[
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Service & Packing Fee', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                      Text('${currencyFormatter.format(serviceFee)} Birr', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                ],
+
+                const Divider(height: 14, color: Color(0xFFE2E8F0)),
+
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Total Payable Amount', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+                    Text(
+                      '${currencyFormatter.format(totalPrice)} Birr',
+                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: AppColors.primary),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 16),
+
+          // 2. PAYMENT METHOD SELECTOR
+          const Text(
+            'Select Payment Method *',
+            style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
+          ),
+          const SizedBox(height: 8),
+
+          Column(
+            children: _paymentAccounts.map((account) {
+              final isSelected = _selectedPaymentMethod == account.method;
+
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 8.0),
+                child: InkWell(
+                  onTap: () => _onSelectPaymentMethod(account, totalPrice),
+                  borderRadius: BorderRadius.circular(12),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 180),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: isSelected ? account.brandBgColor : const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: isSelected ? account.brandColor : const Color(0xFFE2E8F0),
+                        width: isSelected ? 1.8 : 1.0,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(7),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: account.brandColor.withValues(alpha: 0.3)),
+                          ),
+                          child: Icon(account.fallbackIcon, color: account.brandColor, size: 18),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                account.title,
+                                style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              Text(
+                                'Account: ${account.accountNumber}',
+                                style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Icon(
+                          isSelected ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
+                          color: isSelected ? account.brandColor : const Color(0xFFCBD5E1),
+                          size: 18,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+
+          const SizedBox(height: 12),
+
+          // 3. PAYMENT RECEIPT UPLOAD SECTION
+          const Text(
+            'Payment Receipt Slip *',
+            style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'Attach screenshot or camera photo of your transfer receipt',
+            style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
+          ),
+          const SizedBox(height: 8),
+
+          if (_uploadedReceipt == null) ...[
+            // Upload Action Box
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFCBD5E1), style: BorderStyle.solid),
+              ),
+              child: Column(
+                children: [
+                  const Icon(Icons.cloud_upload_rounded, size: 28, color: AppColors.primary),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'No receipt attached yet',
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: _isPickingReceipt ? null : _pickFromCamera,
+                          icon: const Icon(Icons.camera_alt_rounded, size: 14),
+                          label: const Text('Camera', style: TextStyle(fontSize: 11.5)),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: AppColors.primary,
+                            side: const BorderSide(color: AppColors.primary),
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: _isPickingReceipt ? null : _pickFromGallery,
+                          icon: const Icon(Icons.photo_library_rounded, size: 14),
+                          label: const Text('Gallery', style: TextStyle(fontSize: 11.5)),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primary,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ] else ...[
+            // Attached Receipt Card
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF0FDF4),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFF86EFAC)),
+              ),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFDCFCE7),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Icon(Icons.receipt_rounded, color: Color(0xFF16A34A), size: 20),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              _uploadedReceipt!.fileName,
+                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            Text(
+                              '${_uploadedReceipt!.fileSize} • ${_uploadedReceipt!.uploadedAt}',
+                              style: const TextStyle(fontSize: 10.5, color: AppColors.textSecondary),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF16A34A),
+                          borderRadius: BorderRadius.circular(5),
+                        ),
+                        child: const Text('Verified', style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: Colors.white)),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: _showReceiptPreviewDialog,
+                          icon: const Icon(Icons.visibility_rounded, size: 14),
+                          label: const Text('Inspect / Zoom', style: TextStyle(fontSize: 11)),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: AppColors.primary,
+                            side: const BorderSide(color: AppColors.primary),
+                            padding: const EdgeInsets.symmetric(vertical: 6),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      IconButton(
+                        icon: const Icon(Icons.delete_outline_rounded, color: AppColors.error, size: 20),
+                        tooltip: 'Remove receipt',
+                        onPressed: () => setState(() => _uploadedReceipt = null),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+          const SizedBox(height: 12),
+        ],
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Pinned Bottom Action Bar (Inside the Big Card)
+  // ---------------------------------------------------------------------------
+  Widget _buildBottomActionBar() {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(18.0, 12.0, 18.0, 16.0),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(
+          top: BorderSide(
+            color: Color(0xFFF1F5F9),
+            width: 1.2,
+          ),
+        ),
+      ),
+      child: Row(
+        children: [
+          // Left Action (Back button for Steps 2 and 3)
+          if (_currentStep > 0) ...[
+            Expanded(
+              flex: 1,
+              child: OutlinedButton.icon(
+                onPressed: () => _goToStep(_currentStep - 1),
+                icon: const Icon(Icons.arrow_back_rounded, size: 15),
+                label: const Text('Back', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.textPrimary,
+                  side: const BorderSide(color: Color(0xFFCBD5E1)),
+                  padding: const EdgeInsets.symmetric(vertical: 11),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+          ],
+
+          // Right Action
+          Expanded(
+            flex: _currentStep > 0 ? 2 : 1,
+            child: ElevatedButton(
+              onPressed: _isSubmitting
+                  ? null
+                  : () {
+                      if (_currentStep == 0) {
+                        _validateAndProceedFromStep1();
+                      } else if (_currentStep == 1) {
+                        _validateAndProceedFromStep2();
+                      } else {
+                        _handleSubmitDelivery();
+                      }
+                    },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _currentStep == 2 ? const Color(0xFF16A34A) : AppColors.primary,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 11),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                elevation: 2,
+              ),
+              child: _isSubmitting
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    )
+                  : Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Flexible(
+                          child: Text(
+                            _currentStep == 0
+                                ? 'Next'
+                                : _currentStep == 1
+                                    ? 'Go to Checkout'
+                                    : 'Submit Delivery',
+                            style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Icon(
+                          _currentStep == 2 ? Icons.check_circle_outline_rounded : Icons.arrow_forward_rounded,
+                          size: 16,
+                        ),
+                      ],
+                    ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
-// Modal sheet to search and choose from all hotels (No category tabs, direct full list)
+// ---------------------------------------------------------------------------
+// Restaurant Picker Bottom Sheet (Browse all hotels in Bale Robe)
+// ---------------------------------------------------------------------------
 class _RestaurantPickerSheet extends StatefulWidget {
   final ValueChanged<RestaurantModel> onSelected;
 
@@ -1324,8 +2593,7 @@ class _RestaurantPickerSheetState extends State<_RestaurantPickerSheet> {
     final filtered = restaurants.where((r) {
       return query.isEmpty ||
           r.name.toLowerCase().contains(query) ||
-          r.address.toLowerCase().contains(query) ||
-          (r.cuisineType?.toLowerCase().contains(query) ?? false);
+          r.address.toLowerCase().contains(query);
     }).toList();
 
     return Container(
@@ -1336,7 +2604,6 @@ class _RestaurantPickerSheetState extends State<_RestaurantPickerSheet> {
       ),
       child: Column(
         children: [
-          // Drag Handle
           Container(
             width: 40,
             height: 4,
@@ -1346,8 +2613,6 @@ class _RestaurantPickerSheetState extends State<_RestaurantPickerSheet> {
               borderRadius: BorderRadius.circular(2),
             ),
           ),
-
-          // Header
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20.0),
             child: Row(
@@ -1358,16 +2623,9 @@ class _RestaurantPickerSheetState extends State<_RestaurantPickerSheet> {
                   children: [
                     Text(
                       'Explore Hotels & Restaurants',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.textPrimary,
-                      ),
+                      style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
                     ),
-                    Text(
-                      'All verified partner establishments in Bale Robe',
-                      style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
-                    ),
+                    Text('Verified partner establishments in Bale Robe', style: TextStyle(fontSize: 11.5, color: AppColors.textSecondary)),
                   ],
                 ),
                 IconButton(
@@ -1377,58 +2635,73 @@ class _RestaurantPickerSheetState extends State<_RestaurantPickerSheet> {
               ],
             ),
           ),
-
-          const SizedBox(height: 12),
-
-          // Search Field
+          const SizedBox(height: 10),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20.0),
             child: TextField(
               controller: _searchCtrl,
               onChanged: (_) => setState(() {}),
               decoration: InputDecoration(
-                hintText: 'Search by hotel name or address...',
-                hintStyle: const TextStyle(fontSize: 13, color: AppColors.textMuted),
+                hintText: 'Search hotel name or address...',
+                hintStyle: const TextStyle(fontSize: 12.5, color: AppColors.textMuted),
                 prefixIcon: const Icon(Icons.search_rounded, color: AppColors.primary, size: 20),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                 filled: true,
                 fillColor: const Color(0xFFF8FAFC),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-                ),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
               ),
             ),
           ),
-
-          const SizedBox(height: 12),
-          const Divider(height: 1, color: Color(0xFFF1F5F9)),
-
-          // List of All Hotels
+          const SizedBox(height: 10),
           Expanded(
-            child: filtered.isEmpty
+            child: restaurantProvider.isLoading && filtered.isEmpty
                 ? const Center(
-                    child: Text('No hotels found matching your search.', style: TextStyle(color: AppColors.textSecondary)),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        CircularProgressIndicator(color: AppColors.primary),
+                        SizedBox(height: 12),
+                        Text(
+                          'Loading partner hotels in Bale Robe...',
+                          style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                        ),
+                      ],
+                    ),
                   )
-                : ListView.separated(
-                    padding: const EdgeInsets.all(20),
+                : filtered.isEmpty
+                    ? Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.storefront_outlined, size: 40, color: AppColors.textMuted),
+                            const SizedBox(height: 8),
+                            const Text('No hotels found.', style: TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
+                            const SizedBox(height: 8),
+                            TextButton.icon(
+                              onPressed: () => restaurantProvider.fetchRestaurants(),
+                              icon: const Icon(Icons.refresh_rounded, size: 18),
+                              label: const Text('Reload Hotels'),
+                            ),
+                          ],
+                        ),
+                      )
+                    : ListView.separated(
+                    padding: const EdgeInsets.all(16),
                     itemCount: filtered.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 12),
+                    separatorBuilder: (_, __) => const SizedBox(height: 10),
                     itemBuilder: (context, i) {
                       final item = filtered[i];
                       final isCurrent = restaurantProvider.selectedRestaurant?.id == item.id;
 
                       return InkWell(
                         onTap: () => widget.onSelected(item),
-                        borderRadius: BorderRadius.circular(16),
+                        borderRadius: BorderRadius.circular(14),
                         child: Container(
+                          padding: const EdgeInsets.all(10),
                           decoration: BoxDecoration(
                             color: isCurrent ? const Color(0xFFF0F9FF) : Colors.white,
-                            borderRadius: BorderRadius.circular(16),
+                            borderRadius: BorderRadius.circular(14),
                             border: Border.all(
                               color: isCurrent ? AppColors.primary : const Color(0xFFE2E8F0),
                               width: isCurrent ? 1.5 : 1.0,
@@ -1436,87 +2709,69 @@ class _RestaurantPickerSheetState extends State<_RestaurantPickerSheet> {
                             boxShadow: [
                               BoxShadow(
                                 color: Colors.black.withValues(alpha: 0.03),
-                                blurRadius: 8,
+                                blurRadius: 6,
                                 offset: const Offset(0, 2),
                               ),
                             ],
                           ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                          child: Row(
                             children: [
-                              // Partner Cover Image Banner (Matching Admin Cover)
-                              PartnerCoverImage(
-                                bannerUrl: item.banner,
-                                height: 74,
-                                borderRadius: const BorderRadius.vertical(top: Radius.circular(15)),
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(10),
+                                child: Container(
+                                  width: 50,
+                                  height: 50,
+                                  color: const Color(0xFFE0F2FE),
+                                  child: item.avatar != null && item.avatar!.isNotEmpty
+                                      ? Image.network(
+                                          item.avatar!,
+                                          fit: BoxFit.cover,
+                                          errorBuilder: (_, __, ___) =>
+                                              const Icon(Icons.restaurant_rounded, color: AppColors.primary, size: 24),
+                                        )
+                                      : const Icon(Icons.restaurant_rounded, color: AppColors.primary, size: 24),
+                                ),
                               ),
-
-                              Padding(
-                                padding: const EdgeInsets.all(12),
-                                child: Row(
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    ClipRRect(
-                                      borderRadius: BorderRadius.circular(10),
-                                      child: Container(
-                                        width: 44,
-                                        height: 44,
-                                        color: const Color(0xFFE0F2FE),
-                                        child: item.avatar != null && item.avatar!.isNotEmpty
-                                            ? Image.network(
-                                                item.avatar!,
-                                                fit: BoxFit.cover,
-                                                errorBuilder: (_, __, ___) => const Icon(Icons.restaurant_rounded, color: AppColors.primary, size: 22),
-                                              )
-                                            : const Icon(Icons.restaurant_rounded, color: AppColors.primary, size: 22),
-                                      ),
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            item.name,
+                                            style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
+                                          ),
+                                        ),
+                                        if (isCurrent)
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                                            decoration: BoxDecoration(
+                                              color: AppColors.primary,
+                                              borderRadius: BorderRadius.circular(5),
+                                            ),
+                                            child: const Text('Selected', style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: Colors.white)),
+                                          ),
+                                      ],
                                     ),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Row(
-                                            children: [
-                                              Expanded(
-                                                child: Text(
-                                                  item.name,
-                                                  style: const TextStyle(
-                                                    fontSize: 14.5,
-                                                    fontWeight: FontWeight.w800,
-                                                    color: AppColors.textPrimary,
-                                                  ),
-                                                ),
-                                              ),
-                                              if (isCurrent)
-                                                Container(
-                                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                                  decoration: BoxDecoration(
-                                                    color: AppColors.primary,
-                                                    borderRadius: BorderRadius.circular(6),
-                                                  ),
-                                                  child: const Text('Selected', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white)),
-                                                ),
-                                            ],
-                                          ),
-                                          const SizedBox(height: 2),
-                                          Text(
-                                            item.address,
-                                            style: const TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                          const SizedBox(height: 3),
-                                          Row(
-                                            children: [
-                                              const Icon(Icons.access_time_rounded, size: 12, color: AppColors.textMuted),
-                                              const SizedBox(width: 3),
-                                              Text(item.deliveryTime, style: const TextStyle(fontSize: 11, color: AppColors.textMuted)),
-                                              const SizedBox(width: 8),
-                                              Text('• ${item.foods.length} dishes in menu', style: const TextStyle(fontSize: 11, color: AppColors.textMuted)),
-                                            ],
-                                          ),
-                                        ],
-                                      ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      item.address,
+                                      style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Row(
+                                      children: [
+                                        const Icon(Icons.star_rounded, size: 12, color: Color(0xFFEAB308)),
+                                        const SizedBox(width: 2),
+                                        Text('${item.rating}', style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700)),
+                                        const SizedBox(width: 6),
+                                        Text('• ${item.foods.length} dishes', style: const TextStyle(fontSize: 10.5, color: AppColors.textMuted)),
+                                      ],
                                     ),
                                   ],
                                 ),

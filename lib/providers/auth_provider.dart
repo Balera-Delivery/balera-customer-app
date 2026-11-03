@@ -19,6 +19,13 @@ class AuthProvider extends ChangeNotifier {
   bool get isAuthenticated => _status == AuthStatus.authenticated;
 
   AuthProvider() {
+    // Listen for global session expiration from API interceptor
+    StorageService.onSessionExpired = () {
+      _status = AuthStatus.unauthenticated;
+      _currentUser = null;
+      notifyListeners();
+    };
+
     // Check and restore persistent auth state synchronously on startup
     final token = StorageService.getToken();
     final cachedUser = StorageService.getUser();
@@ -179,6 +186,7 @@ class AuthProvider extends ChangeNotifier {
   Future<void> logout() async {
     await _authService.logout();
     await StorageService.clearSession();
+    await StorageService.setOnboardingComplete(false);
     _currentUser = null;
     _status = AuthStatus.unauthenticated;
     notifyListeners();

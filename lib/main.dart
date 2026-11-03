@@ -9,6 +9,7 @@ import 'providers/location_provider.dart';
 import 'providers/notification_provider.dart';
 import 'providers/restaurant_provider.dart';
 import 'services/storage_service.dart';
+import 'views/auth/login_screen.dart';
 import 'views/main/main_navigation_screen.dart';
 import 'views/splash/splash_screen.dart';
 
@@ -64,12 +65,14 @@ class AuthGate extends StatelessWidget {
   Widget build(BuildContext context) {
     final authProvider = context.watch<AuthProvider>();
 
-    // 1. If user is authenticated, directly stay on MainNavigationScreen (Home / app)
+    // 1. If user is authenticated, directly restore MainNavigationScreen at the last active tab
     if (authProvider.isAuthenticated) {
-      return const MainNavigationScreen();
+      return MainNavigationScreen(
+        initialIndex: StorageService.getLastNavIndex(),
+      );
     }
 
-    // 2. If the user is not logged in, always start at the SplashScreen
+    // 2. Unauthenticated / first-time user / after logout: Start at SplashScreen
     return const SplashScreen();
   }
 }
