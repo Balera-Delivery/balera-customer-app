@@ -253,81 +253,75 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: const SystemUiOverlayStyle(
-        statusBarColor: Colors.white,
-        statusBarIconBrightness: Brightness.dark,
-        statusBarBrightness: Brightness.light,
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.light,
+        statusBarBrightness: Brightness.dark,
       ),
       child: Scaffold(
         backgroundColor: Colors.white,
-        body: SafeArea(
-          top: true,
-          bottom: false,
-          child: RefreshIndicator(
-            color: AppColors.primary,
-            onRefresh: () async {
-              await deliveryProvider.fetchDeliveries();
-              await notificationProvider.fetchNotifications();
-            },
-            child: SingleChildScrollView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              padding: EdgeInsets.zero,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // ========================================================
-                  // 1. TOP CURVED HERO SECTION (Matching reference design)
-                  // ========================================================
-                  _buildTopHeroSection(
-                    context: context,
-                    userName: userName,
-                    unreadCount: notificationProvider.unreadCount,
-                    activeDelivery: activeDelivery,
-                    hasActiveDelivery: hasActiveDelivery,
-                  ),
+        body: RefreshIndicator(
+          color: AppColors.primary,
+          onRefresh: () async {
+            await deliveryProvider.fetchDeliveries();
+            await notificationProvider.fetchNotifications();
+          },
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: EdgeInsets.zero,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // ========================================================
+                // 1. TOP CURVED HERO SECTION (Matching Screenshot)
+                // ========================================================
+                _buildTopHeroSection(
+                  context: context,
+                  userName: userName,
+                  unreadCount: notificationProvider.unreadCount,
+                  activeDelivery: activeDelivery,
+                  hasActiveDelivery: hasActiveDelivery,
+                ),
 
-                  const SizedBox(height: 20),
+                const SizedBox(height: 14),
 
-                  // ========================================================
-                  // 2. MAIN BODY CONTENT
-                  // ========================================================
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Special Promotional Banner
-                        _buildPromoBannerCard(context),
+                // ========================================================
+                // 2. MAIN BODY CONTENT
+                // ========================================================
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 18.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Retained Special Promotional Voucher Banner
+                      _buildPromoBannerCard(context),
 
-                        // OTP Verification Box if Rider has Arrived
-                        if (isArrived) ...[
-                          _buildRiderArrivedOtpBox(context, activeDelivery),
-                          const SizedBox(height: 20),
-                        ],
-
-                        // Services / Quick Categories
-                        _buildServicesSection(context),
-                        const SizedBox(height: 24),
-
-                        // Active Deliveries Section (Horizontal scrollable cards)
-                        _buildActiveDeliveriesSection(
-                          context: context,
-                          deliveries: currentDeliveries,
-                          hasDeliveries: currentDeliveries.isNotEmpty,
-                        ),
-                        const SizedBox(height: 24),
-
-                        // "This Week" Bento Stats Section (Count ONLY delivered deliveries)
-                        _buildThisWeekStats(deliveredThisWeekCount),
-                        const SizedBox(height: 24),
-
-                        // Recent Deliveries History Preview
-                        _buildRecentDeliveriesSection(context, recentDeliveries),
-                        const SizedBox(height: 110),
+                      // Active Ongoing Order Tracker Card (if active order exists)
+                      if (hasActiveDelivery) ...[
+                        _buildActiveOngoingTrackerCard(context, activeDelivery),
+                        const SizedBox(height: 18),
                       ],
-                    ),
+
+                      // OTP Verification Box if Rider has Arrived
+                      if (isArrived) ...[
+                        _buildRiderArrivedOtpBox(context, activeDelivery),
+                        const SizedBox(height: 18),
+                      ],
+
+                      // Services Section (6 colorful rounded cards matching screenshot)
+                      _buildServicesSection(context),
+                      const SizedBox(height: 22),
+
+                      // Popular Food Section (2-Column Grid matching screenshot)
+                      _buildPopularFoodSection(context),
+                      const SizedBox(height: 22),
+
+                      // Recent Deliveries History Preview
+                      _buildRecentDeliveriesSection(context, recentDeliveries),
+                      const SizedBox(height: 110),
+                    ],
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         ),
@@ -336,7 +330,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // ---------------------------------------------------------------------------
-  // Top Hero Curved Section (Greeting, Current Delivery Card, Stepper)
+  // Top Hero Curved Section (Matching Screenshot Exactly)
   // ---------------------------------------------------------------------------
   Widget _buildTopHeroSection({
     required BuildContext context,
@@ -345,51 +339,64 @@ class _HomeScreenState extends State<HomeScreen> {
     required DeliveryModel? activeDelivery,
     required bool hasActiveDelivery,
   }) {
+    final topPadding = MediaQuery.of(context).padding.top;
+
     return Container(
       width: double.infinity,
       decoration: const BoxDecoration(
-        gradient: AppColors.logoDarkGradient,
+        gradient: LinearGradient(
+          colors: [Color(0xFF0052EA), Color(0xFF0D5BFF), Color(0xFF1E67FF)],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+        ),
         borderRadius: BorderRadius.only(
-          bottomLeft: Radius.circular(36),
-          bottomRight: Radius.circular(36),
+          bottomLeft: Radius.circular(32),
+          bottomRight: Radius.circular(32),
         ),
         boxShadow: [
           BoxShadow(
-            color: Color(0x350038A8),
-            blurRadius: 28,
-            offset: Offset(0, 10),
+            color: Color(0x350D50DB),
+            blurRadius: 20,
+            offset: Offset(0, 8),
           ),
         ],
       ),
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(20.0, 16.0, 20.0, 24.0),
+        padding: EdgeInsets.fromLTRB(18.0, topPadding + 10.0, 18.0, 22.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Top Bar: User Avatar & Greeting + Notification Bell
+            // Top Bar: Circular Avatar 'B' + Greeting & Name + Bell Button
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                // User Avatar + Greeting Text
                 Row(
                   children: [
+                    // Circular Avatar with letter 'B' matching screenshot
                     Container(
                       width: 44,
                       height: 44,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: Colors.white,
-                        border: Border.all(color: Colors.white.withValues(alpha: 0.9), width: 2),
+                        color: const Color(0xFF0A2668),
+                        border: Border.all(color: Colors.white, width: 2.0),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.12),
-                            blurRadius: 8,
+                            color: Colors.black.withValues(alpha: 0.15),
+                            blurRadius: 6,
                             offset: const Offset(0, 2),
                           ),
                         ],
                       ),
-                      child: const ClipOval(
-                        child: BaleraLogo(size: 40, showShadow: false),
+                      child: const Center(
+                        child: Text(
+                          'B',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w900,
+                            fontSize: 19,
+                          ),
+                        ),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -399,17 +406,16 @@ class _HomeScreenState extends State<HomeScreen> {
                         Text(
                           _getGreeting(),
                           style: TextStyle(
-                            fontSize: 12.5,
-                            fontWeight: FontWeight.w500,
-                            color: Colors.white.withValues(alpha: 0.85),
-                            letterSpacing: 0.2,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w400,
+                            color: Colors.white.withValues(alpha: 0.88),
                           ),
                         ),
                         Text(
-                          userName,
+                          userName.isNotEmpty ? userName : 'Faisa',
                           style: const TextStyle(
-                            fontSize: 16.5,
-                            fontWeight: FontWeight.w800,
+                            fontSize: 17,
+                            fontWeight: FontWeight.w900,
                             color: Colors.white,
                             letterSpacing: -0.2,
                           ),
@@ -419,7 +425,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ],
                 ),
 
-                // Notification Bell Icon Button
+                // Translucent Circular Notification Bell Button
                 InkWell(
                   onTap: () {
                     Navigator.push(
@@ -432,10 +438,10 @@ class _HomeScreenState extends State<HomeScreen> {
                     width: 42,
                     height: 42,
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.22),
+                      color: Colors.white.withValues(alpha: 0.16),
                       shape: BoxShape.circle,
                       border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.35),
+                        color: Colors.white.withValues(alpha: 0.28),
                         width: 1.2,
                       ),
                     ),
@@ -448,7 +454,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                         backgroundColor: AppColors.error,
                         child: const Icon(
-                          Icons.notifications_outlined,
+                          Icons.notifications_none_rounded,
                           color: Colors.white,
                           size: 22,
                         ),
@@ -459,12 +465,15 @@ class _HomeScreenState extends State<HomeScreen> {
               ],
             ),
 
-            const SizedBox(height: 24),
+            const SizedBox(height: 16),
 
-            // ========================================================
-            // Current Delivery Card (Exact match to reference design)
-            // ========================================================
-            _buildCurrentDeliveryCard(context, activeDelivery, hasActiveDelivery),
+            // Hero Card matching screenshot: Balera Delivery, 24/7 pill, stepper
+            _buildBaleraDeliveryHeroCard(context, activeDelivery, hasActiveDelivery),
+
+            const SizedBox(height: 16),
+
+            // Search Bar matching screenshot
+            _buildSearchBar(context),
           ],
         ),
       ),
@@ -472,107 +481,82 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // ---------------------------------------------------------------------------
-  // Current Delivery Card with Timeline Stepper & Tracking Code
+  // Hero Card matching Screenshot (Express Courier, Active 24/7, Stepper)
   // ---------------------------------------------------------------------------
-  Widget _buildCurrentDeliveryCard(
+  Widget _buildBaleraDeliveryHeroCard(
     BuildContext context,
     DeliveryModel? delivery,
     bool hasActive,
   ) {
-    final trackingCode = delivery?.trackingCode != null && delivery!.trackingCode!.trim().isNotEmpty
-        ? (delivery.trackingCode!.startsWith('#') ? delivery.trackingCode! : '#${delivery.trackingCode}')
-        : (delivery != null
-            ? (delivery.id.length >= 8 ? '#${delivery.id.substring(0, 8)}' : '#${delivery.id}')
-            : 'BLR-889641');
-    final statusText = delivery?.status != null ? AppConstants.formatStatus(delivery!.status) : 'In Transit';
-
-    final now = DateTime.now();
-    final pickupDateStr = delivery?.createdAt != null
-        ? Formatters.date(delivery!.createdAt)
-        : Formatters.date(now);
-    final estDeliveryDate = (delivery?.createdAt ?? now).add(const Duration(hours: 2));
-    final estDeliveryStr = 'Est. ${Formatters.date(estDeliveryDate)}';
-
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.10),
-        borderRadius: BorderRadius.circular(24),
+        color: AppColors.heroCardBackground,
+        borderRadius: BorderRadius.circular(22),
         border: Border.all(
           color: Colors.white.withValues(alpha: 0.18),
           width: 1.2,
         ),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF002B82).withValues(alpha: 0.20),
-            blurRadius: 16,
-            offset: const Offset(0, 4),
+            color: const Color(0xFF002B82).withValues(alpha: 0.25),
+            blurRadius: 18,
+            offset: const Offset(0, 6),
           ),
         ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Sub-header Row: "Current Delivery" + Pill Badge + Angled Arrow Button
+          // Row 1: Pill Badge "Express Courier ● Active 24/7" + Arrow Button ↗
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Expanded(
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 4.5),
+                decoration: BoxDecoration(
+                  color: AppColors.heroPillBackground,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.18),
+                    width: 1,
+                  ),
+                ),
                 child: Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Flexible(
-                      child: Text(
-                        hasActive ? 'Current Delivery' : 'Express Courier',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white.withValues(alpha: 0.90),
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                    const Text(
+                      'Express Courier',
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
                       ),
                     ),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: 6),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: AppColors.primary.withValues(alpha: 0.28),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: AppColors.accent.withValues(alpha: 0.35), width: 1),
+                      width: 5.5,
+                      height: 5.5,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFF00E5FF),
+                        shape: BoxShape.circle,
                       ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Container(
-                            width: 6,
-                            height: 6,
-                            decoration: const BoxDecoration(
-                              color: AppColors.accent,
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                          const SizedBox(width: 5),
-                          Text(
-                            hasActive ? statusText : 'Active 24/7',
-                            style: const TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                              color: Colors.white,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ],
+                    ),
+                    const SizedBox(width: 5),
+                    const Text(
+                      'Active 24/7',
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
                       ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(width: 8),
 
-              // Angled Arrow Button ↗
+              // Arrow Action Button ↗
               InkWell(
                 onTap: () {
                   if (hasActive) {
@@ -584,17 +568,21 @@ class _HomeScreenState extends State<HomeScreen> {
                     );
                   }
                 },
-                borderRadius: BorderRadius.circular(20),
+                borderRadius: BorderRadius.circular(10),
                 child: Container(
-                  width: 36,
-                  height: 36,
-                  decoration: const BoxDecoration(
-                    color: AppColors.primary,
-                    shape: BoxShape.circle,
+                  width: 34,
+                  height: 34,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1D64EC),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.25),
+                      width: 1,
+                    ),
                   ),
                   child: const Center(
                     child: Icon(
-                      Icons.arrow_outward_rounded,
+                      Icons.north_east_rounded,
                       color: Colors.white,
                       size: 19,
                     ),
@@ -604,121 +592,71 @@ class _HomeScreenState extends State<HomeScreen> {
             ],
           ),
 
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
 
-          // Tracking Number or Balera Delivery in Prominent Bold Display Font
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            alignment: Alignment.centerLeft,
-            child: Text(
-              hasActive ? trackingCode : 'Balera Delivery',
-              style: TextStyle(
-                fontSize: hasActive ? 24 : 25,
-                fontWeight: FontWeight.w900,
-                color: Colors.white,
-                letterSpacing: hasActive ? 0.5 : -0.3,
-                height: 1.15,
-                shadows: [
-                  Shadow(
-                    color: Colors.black.withValues(alpha: 0.22),
-                    blurRadius: 10,
-                    offset: const Offset(0, 2),
-                  ),
-                  Shadow(
-                    color: AppColors.accent.withValues(alpha: 0.40),
-                    blurRadius: 16,
-                    offset: const Offset(0, 0),
-                  ),
-                ],
-              ),
+          // Big Title "Balera Delivery"
+          const Text(
+            'Balera Delivery',
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.w900,
+              color: Colors.white,
+              letterSpacing: -0.4,
             ),
           ),
 
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
 
-          // Stepper: Date row on top
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Text(
-                  hasActive
-                      ? (delivery?.pickupLocation.isNotEmpty == true ? delivery!.pickupLocation : 'Pickup')
-                      : 'Instant Pickup',
-                  style: TextStyle(
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white.withValues(alpha: 0.85),
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  hasActive
-                      ? (delivery?.destination.isNotEmpty == true ? delivery!.destination : 'Dropoff')
-                      : 'Doorstep Dropoff',
-                  textAlign: TextAlign.right,
-                  style: TextStyle(
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white.withValues(alpha: 0.85),
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 8),
-
-          // Visual Stepper Progress Line with Dotted Track & Vehicle Icon
-          _buildTimelineStepper(hasActive, delivery?.status),
-
-          const SizedBox(height: 8),
-
-          // Pickup and Estimate Subtitle Row
+          // Sub-row: "Instant Pickup" on left, "Doorstep Dropoff" on right
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                pickupDateStr,
+                hasActive && delivery?.pickupLocation.isNotEmpty == true
+                    ? delivery!.pickupLocation
+                    : 'Instant Pickup',
                 style: TextStyle(
-                  fontSize: 10.5,
-                  fontWeight: FontWeight.w500,
-                  color: Colors.white.withValues(alpha: 0.70),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white.withValues(alpha: 0.90),
                 ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
               Text(
-                estDeliveryStr,
+                hasActive && delivery?.destination.isNotEmpty == true
+                    ? delivery!.destination
+                    : 'Doorstep Dropoff',
                 style: TextStyle(
-                  fontSize: 10.5,
-                  fontWeight: FontWeight.w500,
-                  color: Colors.white.withValues(alpha: 0.70),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white.withValues(alpha: 0.90),
                 ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
             ],
           ),
+
+          const SizedBox(height: 10),
+
+          // Stepper Line matching screenshot (Check -> Dotted -> Check -> Dotted -> Bike -> Dotted -> Double Ring)
+          _buildHeroStepper(),
         ],
       ),
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // Timeline Stepper (Checkmark -> Dotted -> Vehicle Pill -> Dotted -> Pin)
-  // ---------------------------------------------------------------------------
-  Widget _buildTimelineStepper(bool hasActive, String? status) {
+  // Stepper Line matching screenshot exactly
+  Widget _buildHeroStepper() {
     return Row(
       children: [
-        // 1. Pickup Checkpoint (Completed)
+        // 1. Check circle 1
         Container(
           width: 22,
           height: 22,
           decoration: const BoxDecoration(
-            color: AppColors.primary,
+            color: Color(0xFF0D5BFF),
             shape: BoxShape.circle,
           ),
           child: const Center(
@@ -727,16 +665,14 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
 
         // Dotted connector
-        Expanded(
-          child: _buildDottedLine(),
-        ),
+        Expanded(child: _buildDottedLine()),
 
-        // 2. Middle In-Transit Checkpoint
+        // 2. Check circle 2
         Container(
           width: 22,
           height: 22,
           decoration: const BoxDecoration(
-            color: AppColors.primary,
+            color: Color(0xFF0D5BFF),
             shape: BoxShape.circle,
           ),
           child: const Center(
@@ -745,54 +681,40 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
 
         // Dotted connector
-        Expanded(
-          child: _buildDottedLine(),
-        ),
+        Expanded(child: _buildDottedLine()),
 
-        // 3. Active Vehicle Indicator (Glowing Courier Pill)
+        // 3. Motorcycle Rider circle (Cyan with dark blue icon matching screenshot)
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          decoration: BoxDecoration(
-            color: AppColors.accent,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.accent.withValues(alpha: 0.5),
-                blurRadius: 10,
-                offset: const Offset(0, 2),
-              ),
-            ],
+          width: 26,
+          height: 26,
+          decoration: const BoxDecoration(
+            color: Color(0xFF00E5FF),
+            shape: BoxShape.circle,
           ),
-          child: const Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                Icons.two_wheeler_rounded,
-                color: Color(0xFF0038A8),
-                size: 16,
-              ),
-            ],
+          child: const Center(
+            child: Icon(
+              Icons.two_wheeler_rounded,
+              color: Color(0xFF0A2668),
+              size: 16,
+            ),
           ),
         ),
 
         // Dotted connector
-        Expanded(
-          child: _buildDottedLine(),
-        ),
+        Expanded(child: _buildDottedLine()),
 
-        // 4. Destination Target Point
+        // 4. Target Double Ring circle
         Container(
-          width: 20,
-          height: 20,
+          width: 22,
+          height: 22,
           decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.3),
             shape: BoxShape.circle,
-            border: Border.all(color: Colors.white.withValues(alpha: 0.8), width: 1.5),
+            border: Border.all(color: Colors.white, width: 2),
           ),
           child: Center(
             child: Container(
-              width: 8,
-              height: 8,
+              width: 7,
+              height: 7,
               decoration: const BoxDecoration(
                 color: Colors.white,
                 shape: BoxShape.circle,
@@ -804,6 +726,71 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  // ---------------------------------------------------------------------------
+  // Search Bar matching screenshot
+  // ---------------------------------------------------------------------------
+  Widget _buildSearchBar(BuildContext context) {
+    return Container(
+      height: 52,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(28),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.search_rounded,
+            color: Color(0xFF64748B),
+            size: 22,
+          ),
+          const SizedBox(width: 10),
+          const Expanded(
+            child: Text(
+              'Search food or restaurant',
+              style: TextStyle(
+                color: Color(0xFF64748B),
+                fontSize: 13.5,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+          InkWell(
+            onTap: () {
+              // Open delivery request
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const CreateDeliveryScreen()),
+              );
+            },
+            borderRadius: BorderRadius.circular(19),
+            child: Container(
+              width: 36,
+              height: 36,
+              decoration: const BoxDecoration(
+                color: Color(0xFF1D64EC),
+                shape: BoxShape.circle,
+              ),
+              child: const Center(
+                child: Icon(
+                  Icons.tune_rounded,
+                  color: Colors.white,
+                  size: 18,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
   Widget _buildDottedLine() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 4.0),
@@ -829,29 +816,157 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // ---------------------------------------------------------------------------
-  // "Services" Section (5 Rounded Icon Cards from the screenshot)
+  // Active Ongoing Order Tracker Card (Matches Page 1 & 2 design)
+  // ---------------------------------------------------------------------------
+  Widget _buildActiveOngoingTrackerCard(BuildContext context, DeliveryModel? delivery) {
+    if (delivery == null) return const SizedBox.shrink();
+
+    final tracking = (delivery.trackingCode != null && delivery.trackingCode!.trim().isNotEmpty)
+        ? (delivery.trackingCode!.startsWith('#') ? delivery.trackingCode! : '#${delivery.trackingCode}')
+        : (delivery.id.length >= 8 ? '#${delivery.id.substring(0, 8)}' : '#${delivery.id}');
+    final statusText = AppConstants.formatStatus(delivery.status);
+
+    return InkWell(
+      onTap: () => _openTrackOrder(context, delivery),
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: const Color(0xFFEFF6FF),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: const Color(0xFFBFDBFE), width: 1.2),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF1D64EC).withValues(alpha: 0.08),
+              blurRadius: 14,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 46,
+              height: 46,
+              decoration: BoxDecoration(
+                color: const Color(0xFF1D64EC),
+                borderRadius: BorderRadius.circular(14),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF1D64EC).withValues(alpha: 0.35),
+                    blurRadius: 8,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
+              ),
+              child: const Center(
+                child: Icon(Icons.two_wheeler_rounded, color: Colors.white, size: 24),
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        width: 7,
+                        height: 7,
+                        decoration: const BoxDecoration(
+                          color: Color(0xFF1D64EC),
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        statusText,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF1D64EC),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Order $tracking',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF64748B),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    '${delivery.pickupLocation} → ${delivery.destination}',
+                    style: const TextStyle(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF0F172A),
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1D64EC),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Text(
+                'Track ›',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 12,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // "Services" Section (6 Colorful Rounded Cards matching Screenshot)
   // ---------------------------------------------------------------------------
   Widget _buildServicesSection(BuildContext context) {
     final services = [
       {
         'title': 'Food',
-        'icon': Icons.restaurant_rounded,
+        'icon': Icons.room_service_outlined,
         'color': const Color(0xFFFEF3C7),
         'iconColor': const Color(0xFFD97706),
         'category': DeliveryCategory.food,
-        'itemType': 'Food & Groceries',
+        'itemType': 'Food & Restaurant',
       },
       {
         'title': 'Parcel',
-        'icon': Icons.inventory_2_rounded,
-        'color': const Color(0xFFEFF6FF),
-        'iconColor': AppColors.primary,
+        'icon': Icons.all_inbox_rounded,
+        'color': const Color(0xFFDBEAFE),
+        'iconColor': const Color(0xFF2563EB),
         'category': DeliveryCategory.other,
         'itemType': 'Parcel / Box',
       },
       {
+        'title': 'Ecommerce',
+        'icon': Icons.shopping_bag_outlined,
+        'color': const Color(0xFFFCE7F3),
+        'iconColor': const Color(0xFFDB2777),
+        'category': DeliveryCategory.other,
+        'itemType': 'Online Orders',
+      },
+      {
         'title': 'Document',
-        'icon': Icons.description_rounded,
+        'icon': Icons.description_outlined,
         'color': const Color(0xFFDCFCE7),
         'iconColor': const Color(0xFF16A34A),
         'category': DeliveryCategory.other,
@@ -859,19 +974,19 @@ class _HomeScreenState extends State<HomeScreen> {
       },
       {
         'title': 'Electronics',
-        'icon': Icons.devices_rounded,
-        'color': const Color(0xFFF3E8FF),
-        'iconColor': const Color(0xFF9333EA),
+        'icon': Icons.headphones_outlined,
+        'color': const Color(0xFFEDE9FE),
+        'iconColor': const Color(0xFF7C3AED),
         'category': DeliveryCategory.other,
         'itemType': 'Electronics & Gadgets',
       },
       {
         'title': 'Anything',
-        'icon': Icons.all_inbox_rounded,
-        'color': const Color(0xFFFEE2E2),
-        'iconColor': const Color(0xFFDC2626),
+        'icon': Icons.auto_awesome_rounded,
+        'color': const Color(0xFFFFE4D6),
+        'iconColor': const Color(0xFFEA580C),
         'category': DeliveryCategory.other,
-        'itemType': 'Other',
+        'itemType': 'Custom Delivery',
       },
     ];
 
@@ -891,15 +1006,20 @@ class _HomeScreenState extends State<HomeScreen> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: services.map((s) {
-            return _buildServiceItem(
-              title: s['title'] as String,
-              icon: s['icon'] as IconData,
-              bgColor: s['color'] as Color,
-              iconColor: s['iconColor'] as Color,
-              onTap: () => _openCategory(
-                context,
-                category: s['category'] as DeliveryCategory,
-                itemType: s['itemType'] as String,
+            return Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 2.0),
+                child: _buildServiceItem(
+                  title: s['title'] as String,
+                  icon: s['icon'] as IconData,
+                  bgColor: s['color'] as Color,
+                  iconColor: s['iconColor'] as Color,
+                  onTap: () => _openCategory(
+                    context,
+                    category: s['category'] as DeliveryCategory,
+                    itemType: s['itemType'] as String,
+                  ),
+                ),
               ),
             );
           }).toList(),
@@ -917,35 +1037,345 @@ class _HomeScreenState extends State<HomeScreen> {
   }) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(18),
+      borderRadius: BorderRadius.circular(16),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            width: 58,
-            height: 58,
+            height: 48,
+            width: double.infinity,
+            constraints: const BoxConstraints(maxWidth: 52),
             decoration: BoxDecoration(
               color: bgColor,
-              borderRadius: BorderRadius.circular(18),
+              borderRadius: BorderRadius.circular(16),
               boxShadow: [
                 BoxShadow(
                   color: iconColor.withValues(alpha: 0.12),
-                  blurRadius: 10,
-                  offset: const Offset(0, 3),
+                  blurRadius: 6,
+                  offset: const Offset(0, 2),
                 ),
               ],
             ),
             child: Center(
-              child: Icon(icon, color: iconColor, size: 26),
+              child: Icon(icon, color: iconColor, size: 23),
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           Text(
             title,
             style: const TextStyle(
-              fontSize: 12,
+              fontSize: 11,
               fontWeight: FontWeight.w700,
               color: Color(0xFF1E293B),
               letterSpacing: -0.2,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // "Popular food" Section (2-Column Cards matching Screenshot)
+  // ---------------------------------------------------------------------------
+  Widget _buildPopularFoodSection(BuildContext context) {
+    final foodItems = [
+      {
+        'title': 'Pizza',
+        'restaurant': 'Green Cafe',
+        'price': 320,
+        'rating': '4.6',
+        'time': '20 min',
+      },
+      {
+        'title': 'Burger',
+        'restaurant': '[Restaurant name]',
+        'price': 180,
+        'rating': '4.5',
+        'time': '15 min',
+      },
+      {
+        'title': 'Tibbs & Injera',
+        'restaurant': 'Goba Traditional Kitchen',
+        'price': 280,
+        'rating': '4.8',
+        'time': '25 min',
+      },
+      {
+        'title': 'Club Sandwich',
+        'restaurant': 'Robe Central Cafe',
+        'price': 150,
+        'rating': '4.4',
+        'time': '18 min',
+      },
+    ];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Title Row: "Popular food" + "View all ›"
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text(
+              'Popular food',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+                color: Color(0xFF0F172A),
+                letterSpacing: -0.4,
+              ),
+            ),
+            InkWell(
+              onTap: () => _openCategory(context, category: DeliveryCategory.food, itemType: 'Food & Groceries'),
+              child: const Row(
+                children: [
+                  Text(
+                    'View all',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF0D5BFF),
+                    ),
+                  ),
+                  SizedBox(width: 3),
+                  Icon(Icons.chevron_right_rounded, size: 16, color: Color(0xFF0D5BFF)),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
+
+        // 2-Column Grid matching screenshot
+        GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: foodItems.length,
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            crossAxisSpacing: 14,
+            mainAxisSpacing: 14,
+            childAspectRatio: 0.72,
+          ),
+          itemBuilder: (context, index) {
+            final item = foodItems[index];
+            return _buildPopularFoodCard(
+              context: context,
+              title: item['title'] as String,
+              restaurant: item['restaurant'] as String,
+              price: item['price'] as int,
+              rating: item['rating'] as String,
+              time: item['time'] as String,
+            );
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPopularFoodCard({
+    required BuildContext context,
+    required String title,
+    required String restaurant,
+    required int price,
+    required String rating,
+    required String time,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFE2E8F0), width: 1.0),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0F172A).withValues(alpha: 0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Upper Half: Soft light-blue image container with Heart button & White Pill Price Badge
+          Stack(
+            children: [
+              Container(
+                height: 110,
+                width: double.infinity,
+                decoration: const BoxDecoration(
+                  color: Color(0xFFEFF6FF),
+                  borderRadius: BorderRadius.only(
+                    topLeft: Radius.circular(19),
+                    topRight: Radius.circular(19),
+                  ),
+                ),
+                child: const Center(
+                  child: Icon(
+                    Icons.image_outlined,
+                    size: 40,
+                    color: Color(0xFF93B4F5),
+                  ),
+                ),
+              ),
+
+              // Heart / Favorite circular button
+              Positioned(
+                top: 8,
+                right: 8,
+                child: Container(
+                  width: 28,
+                  height: 28,
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Color(0x14000000),
+                        blurRadius: 4,
+                        offset: Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: const Center(
+                    child: Icon(
+                      Icons.favorite_border_rounded,
+                      size: 15,
+                      color: Color(0xFF64748B),
+                    ),
+                  ),
+                ),
+              ),
+
+              // White Pill Price Badge with bold blue text (matching screenshot)
+              Positioned(
+                bottom: 8,
+                left: 8,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(10),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.08),
+                        blurRadius: 4,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Text(
+                    'ETB $price',
+                    style: const TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF0D5BFF),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+
+          // Lower Half: Food details, Restaurant storefront, Rating & Blue '+' button
+          Padding(
+            padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF0F172A),
+                    letterSpacing: -0.2,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 3),
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.storefront_outlined,
+                      size: 13,
+                      color: Color(0xFF0D5BFF),
+                    ),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: Text(
+                        restaurant,
+                        style: const TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w500,
+                          color: Color(0xFF64748B),
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.star_rounded,
+                          size: 15,
+                          color: Color(0xFFF59E0B),
+                        ),
+                        const SizedBox(width: 3),
+                        Text(
+                          '$rating · $time',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF475569),
+                          ),
+                        ),
+                      ],
+                    ),
+                    InkWell(
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => CreateDeliveryScreen(
+                              initialCategory: DeliveryCategory.food,
+                              initialItemType: '$title from $restaurant',
+                            ),
+                          ),
+                        );
+                      },
+                      borderRadius: BorderRadius.circular(15),
+                      child: Container(
+                        width: 30,
+                        height: 30,
+                        decoration: const BoxDecoration(
+                          color: Color(0xFF0D5BFF),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Center(
+                          child: Icon(
+                            Icons.add_rounded,
+                            color: Colors.white,
+                            size: 19,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
         ],

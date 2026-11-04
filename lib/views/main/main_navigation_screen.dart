@@ -204,8 +204,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                   colors: [
-                    Color(0xFF0052CC),
-                    Color(0xFF003893),
+                    Color(0xFF1D64EC),
+                    Color(0xFF0D50DB),
                   ],
                 ),
                 border: Border.all(
@@ -214,21 +214,10 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: const Color(0xFF0047BA).withValues(alpha: 0.42),
+                    color: const Color(0xFF1D64EC).withValues(alpha: 0.38),
                     blurRadius: _glowAnimation.value,
                     spreadRadius: 1.5,
                     offset: const Offset(0, 4),
-                  ),
-                  BoxShadow(
-                    color: const Color(0xFF00D2FF).withValues(alpha: 0.32),
-                    blurRadius: _glowAnimation.value * 1.5,
-                    spreadRadius: 0.5,
-                    offset: const Offset(0, 0),
-                  ),
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.12),
-                    blurRadius: 8,
-                    offset: const Offset(0, 3),
                   ),
                 ],
               ),
@@ -249,46 +238,11 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
                   borderRadius: BorderRadius.circular(27),
                   splashColor: Colors.white.withValues(alpha: 0.3),
                   highlightColor: Colors.white.withValues(alpha: 0.15),
-                  child: Center(
-                    child: Stack(
-                      alignment: Alignment.center,
-                      clipBehavior: Clip.none,
-                      children: [
-                        const Icon(
-                          Icons.local_shipping_rounded,
-                          color: Colors.white,
-                          size: 25,
-                        ),
-                        Positioned(
-                          right: -3,
-                          top: -3,
-                          child: Container(
-                            width: 15,
-                            height: 15,
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF00E5FF),
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: const Color(0xFF003893),
-                                width: 1.8,
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: const Color(0xFF00E5FF).withValues(alpha: 0.65),
-                                  blurRadius: 4,
-                                ),
-                              ],
-                            ),
-                            child: const Center(
-                              child: Icon(
-                                Icons.add_rounded,
-                                size: 9.5,
-                                color: Color(0xFF002266),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
+                  child: const Center(
+                    child: Icon(
+                      Icons.local_shipping_rounded,
+                      color: Colors.white,
+                      size: 26,
                     ),
                   ),
                 ),

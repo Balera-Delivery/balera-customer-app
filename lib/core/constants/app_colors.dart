@@ -9,6 +9,32 @@ class AppColors {
   static const Color accentLight = Color(0xFFBCEBFE); // Soft Ice Cyan Tint
   static const Color accentDark = Color(0xFF0096C7);
 
+  // Modern Royal Blue Gradients (Matching Home, Tracking & Profile PDF UI)
+  static const LinearGradient heroHeaderGradient = LinearGradient(
+    colors: [Color(0xFF0D50DB), Color(0xFF1E67FF)],
+    begin: Alignment.topCenter,
+    end: Alignment.bottomCenter,
+  );
+
+  static const Color headerBlueDark = Color(0xFF0D50DB);
+  static const Color headerBlueVibrant = Color(0xFF1E67FF);
+  static const Color heroCardBackground = Color(0xFF1147C4);
+  static const Color heroPillBackground = Color(0xFF1B51CF);
+
+  // Service Category Pastel Backgrounds & Icons
+  static const Color serviceFoodBg = Color(0xFFFEF3C7);
+  static const Color serviceFoodIcon = Color(0xFFD97706);
+  static const Color serviceParcelBg = Color(0xFFDBEAFE);
+  static const Color serviceParcelIcon = Color(0xFF2563EB);
+  static const Color serviceEcommerceBg = Color(0xFFFCE7F3);
+  static const Color serviceEcommerceIcon = Color(0xFFDB2777);
+  static const Color serviceDocBg = Color(0xFFDCFCE7);
+  static const Color serviceDocIcon = Color(0xFF16A34A);
+  static const Color serviceElectronicsBg = Color(0xFFEDE9FE);
+  static const Color serviceElectronicsIcon = Color(0xFF7C3AED);
+  static const Color serviceAnythingBg = Color(0xFFFFEDD5);
+  static const Color serviceAnythingIcon = Color(0xFFEA580C);
+
   // Deep Navy Cosmic Tones (Matching Logo Badge Background & Modern Cards)
   static const Color navyDark = Color(0xFF030D26); // Midnight Obsidian Blue
   static const Color navySurface = Color(0xFF08173E); // Elevated Card Navy

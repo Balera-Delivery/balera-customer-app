@@ -130,7 +130,6 @@ class _WaitingForRiderScreenState extends State<WaitingForRiderScreen> {
       }
     } catch (_) {
       // Silent retry in background
-    }
     } finally {
       if (mounted) {
         setState(() {
