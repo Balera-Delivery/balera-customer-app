@@ -8,9 +8,11 @@ import '../../core/utils/formatters.dart';
 import '../../core/widgets/balera_logo.dart';
 import '../../core/widgets/status_badge.dart';
 import '../../models/delivery_model.dart';
+import '../../models/food_item_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/delivery_provider.dart';
 import '../../providers/notification_provider.dart';
+import '../../providers/restaurant_provider.dart';
 import '../delivery/create_delivery_screen.dart';
 import '../delivery/delivery_details_screen.dart';
 import '../delivery/delivery_otp_screen.dart';
@@ -34,6 +36,8 @@ class _HomeScreenState extends State<HomeScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<DeliveryProvider>().fetchDeliveries();
       context.read<NotificationProvider>().fetchNotifications();
+      context.read<RestaurantProvider>().fetchRestaurants();
+      context.read<RestaurantProvider>().fetchFoods();
     });
     _refreshTimer = Timer.periodic(const Duration(seconds: 8), (_) {
       if (mounted) {
@@ -259,36 +263,36 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       child: Scaffold(
         backgroundColor: Colors.white,
-        body: RefreshIndicator(
-          color: AppColors.primary,
-          onRefresh: () async {
-            await deliveryProvider.fetchDeliveries();
-            await notificationProvider.fetchNotifications();
-          },
-          child: SingleChildScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            padding: EdgeInsets.zero,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // ========================================================
-                // 1. TOP CURVED HERO SECTION (Matching Screenshot)
-                // ========================================================
-                _buildTopHeroSection(
-                  context: context,
-                  userName: userName,
-                  unreadCount: notificationProvider.unreadCount,
-                  activeDelivery: activeDelivery,
-                  hasActiveDelivery: hasActiveDelivery,
-                ),
+        body: Column(
+          children: [
+            // ========================================================
+            // 1. FIXED TOP BAR (Curved, Medium Size)
+            // ========================================================
+            _buildTopHeroSection(
+              context: context,
+              userName: userName,
+              unreadCount: notificationProvider.unreadCount,
+              activeDelivery: activeDelivery,
+              hasActiveDelivery: hasActiveDelivery,
+            ),
 
-                const SizedBox(height: 14),
-
-                // ========================================================
-                // 2. MAIN BODY CONTENT
-                // ========================================================
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 18.0),
+            // ========================================================
+            // 2. SCROLLABLE BODY CONTENT
+            // ========================================================
+            Expanded(
+              child: RefreshIndicator(
+                color: AppColors.primary,
+                onRefresh: () async {
+                  await Future.wait([
+                    deliveryProvider.fetchDeliveries(),
+                    notificationProvider.fetchNotifications(),
+                    context.read<RestaurantProvider>().fetchRestaurants(),
+                    context.read<RestaurantProvider>().fetchFoods(),
+                  ]);
+                },
+                child: SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.fromLTRB(18.0, 14.0, 18.0, 110.0),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -311,26 +315,25 @@ class _HomeScreenState extends State<HomeScreen> {
                       _buildServicesSection(context),
                       const SizedBox(height: 22),
 
-                      // Popular Food Section (2-Column Grid matching screenshot)
+                      // Popular Food Section (Dynamic from Partner Hotels / Admin Dashboard)
                       _buildPopularFoodSection(context),
                       const SizedBox(height: 22),
 
                       // Recent Deliveries History Preview
                       _buildRecentDeliveriesSection(context, recentDeliveries),
-                      const SizedBox(height: 110),
                     ],
                   ),
                 ),
-              ],
+              ),
             ),
-          ),
+          ],
         ),
       ),
     );
   }
 
   // ---------------------------------------------------------------------------
-  // Top Hero Curved Section (Matching Screenshot Exactly)
+  // Top Hero Curved Section (Fixed in place, Medium size)
   // ---------------------------------------------------------------------------
   Widget _buildTopHeroSection({
     required BuildContext context,
@@ -350,20 +353,21 @@ class _HomeScreenState extends State<HomeScreen> {
           end: Alignment.bottomCenter,
         ),
         borderRadius: BorderRadius.only(
-          bottomLeft: Radius.circular(32),
-          bottomRight: Radius.circular(32),
+          bottomLeft: Radius.circular(26),
+          bottomRight: Radius.circular(26),
         ),
         boxShadow: [
           BoxShadow(
             color: Color(0x350D50DB),
-            blurRadius: 20,
-            offset: Offset(0, 8),
+            blurRadius: 16,
+            offset: Offset(0, 6),
           ),
         ],
       ),
       child: Padding(
-        padding: EdgeInsets.fromLTRB(18.0, topPadding + 10.0, 18.0, 22.0),
+        padding: EdgeInsets.fromLTRB(16.0, topPadding + 6.0, 16.0, 12.0),
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Top Bar: Circular Avatar 'B' + Greeting & Name + Bell Button
@@ -374,8 +378,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   children: [
                     // Circular Avatar with letter 'B' matching screenshot
                     Container(
-                      width: 44,
-                      height: 44,
+                      width: 38,
+                      height: 38,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         color: const Color(0xFF0A2668),
@@ -383,7 +387,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         boxShadow: [
                           BoxShadow(
                             color: Colors.black.withValues(alpha: 0.15),
-                            blurRadius: 6,
+                            blurRadius: 5,
                             offset: const Offset(0, 2),
                           ),
                         ],
@@ -394,19 +398,19 @@ class _HomeScreenState extends State<HomeScreen> {
                           style: TextStyle(
                             color: Colors.white,
                             fontWeight: FontWeight.w900,
-                            fontSize: 19,
+                            fontSize: 16,
                           ),
                         ),
                       ),
                     ),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: 10),
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
                           _getGreeting(),
                           style: TextStyle(
-                            fontSize: 12,
+                            fontSize: 11,
                             fontWeight: FontWeight.w400,
                             color: Colors.white.withValues(alpha: 0.88),
                           ),
@@ -414,7 +418,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         Text(
                           userName.isNotEmpty ? userName : 'Faisa',
                           style: const TextStyle(
-                            fontSize: 17,
+                            fontSize: 15,
                             fontWeight: FontWeight.w900,
                             color: Colors.white,
                             letterSpacing: -0.2,
@@ -433,16 +437,16 @@ class _HomeScreenState extends State<HomeScreen> {
                       MaterialPageRoute(builder: (_) => const NotificationsScreen()),
                     );
                   },
-                  borderRadius: BorderRadius.circular(24),
+                  borderRadius: BorderRadius.circular(20),
                   child: Container(
-                    width: 42,
-                    height: 42,
+                    width: 36,
+                    height: 36,
                     decoration: BoxDecoration(
                       color: Colors.white.withValues(alpha: 0.16),
                       shape: BoxShape.circle,
                       border: Border.all(
                         color: Colors.white.withValues(alpha: 0.28),
-                        width: 1.2,
+                        width: 1.0,
                       ),
                     ),
                     child: Center(
@@ -450,13 +454,13 @@ class _HomeScreenState extends State<HomeScreen> {
                         isLabelVisible: unreadCount > 0,
                         label: Text(
                           '$unreadCount',
-                          style: const TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.bold),
+                          style: const TextStyle(fontSize: 9, color: Colors.white, fontWeight: FontWeight.bold),
                         ),
                         backgroundColor: AppColors.error,
                         child: const Icon(
                           Icons.notifications_none_rounded,
                           color: Colors.white,
-                          size: 22,
+                          size: 19,
                         ),
                       ),
                     ),
@@ -465,12 +469,12 @@ class _HomeScreenState extends State<HomeScreen> {
               ],
             ),
 
-            const SizedBox(height: 16),
+            const SizedBox(height: 10),
 
-            // Hero Card matching screenshot: Balera Delivery, 24/7 pill, stepper
+            // Hero Card: Balera Delivery, 24/7 pill, compact stepper
             _buildBaleraDeliveryHeroCard(context, activeDelivery, hasActiveDelivery),
 
-            const SizedBox(height: 16),
+            const SizedBox(height: 10),
 
             // Search Bar matching screenshot
             _buildSearchBar(context),
@@ -481,7 +485,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // ---------------------------------------------------------------------------
-  // Hero Card matching Screenshot (Express Courier, Active 24/7, Stepper)
+  // Hero Card matching Screenshot (Medium, streamlined height)
   // ---------------------------------------------------------------------------
   Widget _buildBaleraDeliveryHeroCard(
     BuildContext context,
@@ -490,23 +494,24 @@ class _HomeScreenState extends State<HomeScreen> {
   ) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
       decoration: BoxDecoration(
-        color: AppColors.heroCardBackground,
-        borderRadius: BorderRadius.circular(22),
+        color: const Color(0xFF0038A8).withValues(alpha: 0.45),
+        borderRadius: BorderRadius.circular(18),
         border: Border.all(
-          color: Colors.white.withValues(alpha: 0.18),
-          width: 1.2,
+          color: Colors.white.withValues(alpha: 0.20),
+          width: 1.0,
         ),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF002B82).withValues(alpha: 0.25),
-            blurRadius: 18,
-            offset: const Offset(0, 6),
+            color: const Color(0xFF002B82).withValues(alpha: 0.20),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Row 1: Pill Badge "Express Courier ● Active 24/7" + Arrow Button ↗
@@ -514,12 +519,12 @@ class _HomeScreenState extends State<HomeScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 4.5),
+                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3.5),
                 decoration: BoxDecoration(
-                  color: AppColors.heroPillBackground,
-                  borderRadius: BorderRadius.circular(20),
+                  color: Colors.white.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(16),
                   border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.18),
+                    color: Colors.white.withValues(alpha: 0.20),
                     width: 1,
                   ),
                 ),
@@ -529,25 +534,25 @@ class _HomeScreenState extends State<HomeScreen> {
                     const Text(
                       'Express Courier',
                       style: TextStyle(
-                        fontSize: 11.5,
+                        fontSize: 10.5,
                         fontWeight: FontWeight.w700,
                         color: Colors.white,
                       ),
                     ),
-                    const SizedBox(width: 6),
+                    const SizedBox(width: 5),
                     Container(
-                      width: 5.5,
-                      height: 5.5,
+                      width: 4.5,
+                      height: 4.5,
                       decoration: const BoxDecoration(
                         color: Color(0xFF00E5FF),
                         shape: BoxShape.circle,
                       ),
                     ),
-                    const SizedBox(width: 5),
+                    const SizedBox(width: 4),
                     const Text(
                       'Active 24/7',
                       style: TextStyle(
-                        fontSize: 11.5,
+                        fontSize: 10.5,
                         fontWeight: FontWeight.w700,
                         color: Colors.white,
                       ),
@@ -568,13 +573,13 @@ class _HomeScreenState extends State<HomeScreen> {
                     );
                   }
                 },
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(8),
                 child: Container(
-                  width: 34,
-                  height: 34,
+                  width: 28,
+                  height: 28,
                   decoration: BoxDecoration(
-                    color: const Color(0xFF1D64EC),
-                    borderRadius: BorderRadius.circular(10),
+                    color: const Color(0xFF0D5BFF),
+                    borderRadius: BorderRadius.circular(8),
                     border: Border.all(
                       color: Colors.white.withValues(alpha: 0.25),
                       width: 1,
@@ -584,7 +589,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: Icon(
                       Icons.north_east_rounded,
                       color: Colors.white,
-                      size: 19,
+                      size: 16,
                     ),
                   ),
                 ),
@@ -592,20 +597,20 @@ class _HomeScreenState extends State<HomeScreen> {
             ],
           ),
 
-          const SizedBox(height: 12),
+          const SizedBox(height: 7),
 
-          // Big Title "Balera Delivery"
+          // Title "Balera Delivery"
           const Text(
             'Balera Delivery',
             style: TextStyle(
-              fontSize: 24,
+              fontSize: 19,
               fontWeight: FontWeight.w900,
               color: Colors.white,
-              letterSpacing: -0.4,
+              letterSpacing: -0.3,
             ),
           ),
 
-          const SizedBox(height: 14),
+          const SizedBox(height: 7),
 
           // Sub-row: "Instant Pickup" on left, "Doorstep Dropoff" on right
           Row(
@@ -616,7 +621,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     ? delivery!.pickupLocation
                     : 'Instant Pickup',
                 style: TextStyle(
-                  fontSize: 12,
+                  fontSize: 11,
                   fontWeight: FontWeight.w600,
                   color: Colors.white.withValues(alpha: 0.90),
                 ),
@@ -628,7 +633,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     ? delivery!.destination
                     : 'Doorstep Dropoff',
                 style: TextStyle(
-                  fontSize: 12,
+                  fontSize: 11,
                   fontWeight: FontWeight.w600,
                   color: Colors.white.withValues(alpha: 0.90),
                 ),
@@ -638,9 +643,9 @@ class _HomeScreenState extends State<HomeScreen> {
             ],
           ),
 
-          const SizedBox(height: 10),
+          const SizedBox(height: 7),
 
-          // Stepper Line matching screenshot (Check -> Dotted -> Check -> Dotted -> Bike -> Dotted -> Double Ring)
+          // Stepper Line matching screenshot
           _buildHeroStepper(),
         ],
       ),
@@ -653,14 +658,14 @@ class _HomeScreenState extends State<HomeScreen> {
       children: [
         // 1. Check circle 1
         Container(
-          width: 22,
-          height: 22,
+          width: 20,
+          height: 20,
           decoration: const BoxDecoration(
             color: Color(0xFF0D5BFF),
             shape: BoxShape.circle,
           ),
           child: const Center(
-            child: Icon(Icons.check_rounded, color: Colors.white, size: 14),
+            child: Icon(Icons.check_rounded, color: Colors.white, size: 13),
           ),
         ),
 
@@ -669,14 +674,14 @@ class _HomeScreenState extends State<HomeScreen> {
 
         // 2. Check circle 2
         Container(
-          width: 22,
-          height: 22,
+          width: 20,
+          height: 20,
           decoration: const BoxDecoration(
             color: Color(0xFF0D5BFF),
             shape: BoxShape.circle,
           ),
           child: const Center(
-            child: Icon(Icons.check_rounded, color: Colors.white, size: 14),
+            child: Icon(Icons.check_rounded, color: Colors.white, size: 13),
           ),
         ),
 
@@ -685,8 +690,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
         // 3. Motorcycle Rider circle (Cyan with dark blue icon matching screenshot)
         Container(
-          width: 26,
-          height: 26,
+          width: 22,
+          height: 22,
           decoration: const BoxDecoration(
             color: Color(0xFF00E5FF),
             shape: BoxShape.circle,
@@ -695,7 +700,7 @@ class _HomeScreenState extends State<HomeScreen> {
             child: Icon(
               Icons.two_wheeler_rounded,
               color: Color(0xFF0A2668),
-              size: 16,
+              size: 14,
             ),
           ),
         ),
@@ -705,16 +710,16 @@ class _HomeScreenState extends State<HomeScreen> {
 
         // 4. Target Double Ring circle
         Container(
-          width: 22,
-          height: 22,
+          width: 20,
+          height: 20,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             border: Border.all(color: Colors.white, width: 2),
           ),
           child: Center(
             child: Container(
-              width: 7,
-              height: 7,
+              width: 6,
+              height: 6,
               decoration: const BoxDecoration(
                 color: Colors.white,
                 shape: BoxShape.circle,
@@ -727,20 +732,20 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // ---------------------------------------------------------------------------
-  // Search Bar matching screenshot
+  // Search Bar matching screenshot (Compact Height 44)
   // ---------------------------------------------------------------------------
   Widget _buildSearchBar(BuildContext context) {
     return Container(
-      height: 52,
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      height: 44,
+      padding: const EdgeInsets.symmetric(horizontal: 14),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(28),
+        borderRadius: BorderRadius.circular(22),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.08),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
           ),
         ],
       ),
@@ -749,15 +754,15 @@ class _HomeScreenState extends State<HomeScreen> {
           const Icon(
             Icons.search_rounded,
             color: Color(0xFF64748B),
-            size: 22,
+            size: 20,
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 8),
           const Expanded(
             child: Text(
               'Search food or restaurant',
               style: TextStyle(
                 color: Color(0xFF64748B),
-                fontSize: 13.5,
+                fontSize: 13,
                 fontWeight: FontWeight.w500,
               ),
             ),
@@ -770,19 +775,19 @@ class _HomeScreenState extends State<HomeScreen> {
                 MaterialPageRoute(builder: (_) => const CreateDeliveryScreen()),
               );
             },
-            borderRadius: BorderRadius.circular(19),
+            borderRadius: BorderRadius.circular(15),
             child: Container(
-              width: 36,
-              height: 36,
+              width: 30,
+              height: 30,
               decoration: const BoxDecoration(
-                color: Color(0xFF1D64EC),
+                color: Color(0xFF0D5BFF),
                 shape: BoxShape.circle,
               ),
               child: const Center(
                 child: Icon(
                   Icons.tune_rounded,
                   color: Colors.white,
-                  size: 18,
+                  size: 16,
                 ),
               ),
             ),
@@ -791,6 +796,7 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
   }
+
   Widget _buildDottedLine() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 4.0),
@@ -1079,39 +1085,12 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // ---------------------------------------------------------------------------
-  // "Popular food" Section (2-Column Cards matching Screenshot)
+  // "Popular food" Section (Dynamic from Partner Hotels / Admin Dashboard)
   // ---------------------------------------------------------------------------
   Widget _buildPopularFoodSection(BuildContext context) {
-    final foodItems = [
-      {
-        'title': 'Pizza',
-        'restaurant': 'Green Cafe',
-        'price': 320,
-        'rating': '4.6',
-        'time': '20 min',
-      },
-      {
-        'title': 'Burger',
-        'restaurant': '[Restaurant name]',
-        'price': 180,
-        'rating': '4.5',
-        'time': '15 min',
-      },
-      {
-        'title': 'Tibbs & Injera',
-        'restaurant': 'Goba Traditional Kitchen',
-        'price': 280,
-        'rating': '4.8',
-        'time': '25 min',
-      },
-      {
-        'title': 'Club Sandwich',
-        'restaurant': 'Robe Central Cafe',
-        'price': 150,
-        'rating': '4.4',
-        'time': '18 min',
-      },
-    ];
+    final restaurantProvider = context.watch<RestaurantProvider>();
+    final foods = restaurantProvider.foods;
+    final isLoading = restaurantProvider.isLoadingFoods && foods.isEmpty;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1150,35 +1129,73 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         const SizedBox(height: 14),
 
-        // 2-Column Grid matching screenshot
-        GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: foodItems.length,
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 2,
-            crossAxisSpacing: 14,
-            mainAxisSpacing: 14,
-            childAspectRatio: 0.72,
+        if (isLoading)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 24.0),
+            child: Center(
+              child: CircularProgressIndicator(
+                strokeWidth: 2.5,
+                color: Color(0xFF0D5BFF),
+              ),
+            ),
+          )
+        else if (foods.isEmpty)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: const Center(
+              child: Text(
+                'No partner food items available right now.',
+                style: TextStyle(color: Color(0xFF64748B), fontSize: 13, fontWeight: FontWeight.w600),
+              ),
+            ),
+          )
+        else
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: foods.length.clamp(0, 10),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              crossAxisSpacing: 14,
+              mainAxisSpacing: 14,
+              childAspectRatio: 0.72,
+            ),
+            itemBuilder: (context, index) {
+              final food = foods[index];
+              final restaurantName = (food.restaurantName != null && food.restaurantName!.isNotEmpty)
+                  ? food.restaurantName!
+                  : restaurantProvider.getRestaurantName(food.restaurantId);
+              final time = (food.restaurantDeliveryTime != null && food.restaurantDeliveryTime!.isNotEmpty)
+                  ? food.restaurantDeliveryTime!
+                  : restaurantProvider.getRestaurantDeliveryTime(food.restaurantId);
+              final rating = (food.restaurantRating != null)
+                  ? food.restaurantRating!.toStringAsFixed(1)
+                  : restaurantProvider.getRestaurantRating(food.restaurantId).toStringAsFixed(1);
+
+              return _buildPopularFoodCard(
+                context: context,
+                food: food,
+                title: food.name,
+                restaurant: restaurantName,
+                price: food.price.toInt(),
+                rating: rating,
+                time: time,
+              );
+            },
           ),
-          itemBuilder: (context, index) {
-            final item = foodItems[index];
-            return _buildPopularFoodCard(
-              context: context,
-              title: item['title'] as String,
-              restaurant: item['restaurant'] as String,
-              price: item['price'] as int,
-              rating: item['rating'] as String,
-              time: item['time'] as String,
-            );
-          },
-        ),
       ],
     );
   }
 
   Widget _buildPopularFoodCard({
     required BuildContext context,
+    required FoodItemModel food,
     required String title,
     required String restaurant,
     required int price,
@@ -1214,13 +1231,31 @@ class _HomeScreenState extends State<HomeScreen> {
                     topRight: Radius.circular(19),
                   ),
                 ),
-                child: const Center(
-                  child: Icon(
-                    Icons.image_outlined,
-                    size: 40,
-                    color: Color(0xFF93B4F5),
-                  ),
-                ),
+                child: food.image != null && food.image!.startsWith('http')
+                    ? ClipRRect(
+                        borderRadius: const BorderRadius.only(
+                          topLeft: Radius.circular(19),
+                          topRight: Radius.circular(19),
+                        ),
+                        child: Image.network(
+                          food.image!,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => const Center(
+                            child: Icon(
+                              Icons.image_outlined,
+                              size: 40,
+                              color: Color(0xFF93B4F5),
+                            ),
+                          ),
+                        ),
+                      )
+                    : const Center(
+                        child: Icon(
+                          Icons.image_outlined,
+                          size: 40,
+                          color: Color(0xFF93B4F5),
+                        ),
+                      ),
               ),
 
               // Heart / Favorite circular button

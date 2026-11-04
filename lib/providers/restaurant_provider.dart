@@ -7,21 +7,25 @@ class RestaurantProvider extends ChangeNotifier {
   final RestaurantService _restaurantService = RestaurantService();
 
   final List<RestaurantModel> _restaurants = [];
+  final List<FoodItemModel> _foods = [];
   RestaurantModel? _selectedRestaurant;
   FoodItemModel? _selectedFoodItem;
   int _selectedQuantity = 1;
 
   bool _isLoading = false;
   bool _isLoadingMenu = false;
+  bool _isLoadingFoods = false;
   String? _errorMessage;
   String _searchQuery = '';
 
   List<RestaurantModel> get restaurants => _restaurants;
+  List<FoodItemModel> get foods => _foods;
   RestaurantModel? get selectedRestaurant => _selectedRestaurant;
   FoodItemModel? get selectedFoodItem => _selectedFoodItem;
   int get selectedQuantity => _selectedQuantity;
   bool get isLoading => _isLoading;
   bool get isLoadingMenu => _isLoadingMenu;
+  bool get isLoadingFoods => _isLoadingFoods;
   String? get errorMessage => _errorMessage;
   String get searchQuery => _searchQuery;
 
@@ -32,7 +36,51 @@ class RestaurantProvider extends ChangeNotifier {
 
   RestaurantProvider() {
     _restaurants.addAll(_getFallbackRestaurants());
+    _populateFallbackFoods();
     fetchRestaurants();
+    fetchFoods();
+  }
+
+  void _populateFallbackFoods() {
+    _foods.clear();
+    for (final r in _restaurants) {
+      for (final f in r.foods) {
+        _foods.add(
+          f.copyWith(
+            restaurantName: r.name,
+            restaurantDeliveryTime: r.deliveryTime,
+            restaurantRating: r.rating,
+          ),
+        );
+      }
+    }
+  }
+
+  String getRestaurantName(String restaurantId) {
+    for (final r in _restaurants) {
+      if (r.id == restaurantId || r.code == restaurantId) {
+        return r.name;
+      }
+    }
+    return 'Partner Restaurant';
+  }
+
+  String getRestaurantDeliveryTime(String restaurantId) {
+    for (final r in _restaurants) {
+      if (r.id == restaurantId || r.code == restaurantId) {
+        return r.deliveryTime;
+      }
+    }
+    return '20 - 30 min';
+  }
+
+  double getRestaurantRating(String restaurantId) {
+    for (final r in _restaurants) {
+      if (r.id == restaurantId || r.code == restaurantId) {
+        return r.rating;
+      }
+    }
+    return 4.7;
   }
 
   // Fetch all active partner hotels from backend
@@ -65,6 +113,47 @@ class RestaurantProvider extends ChangeNotifier {
     }
 
     _isLoading = false;
+    notifyListeners();
+  }
+
+  // Fetch all partner food dishes across restaurants (GET /api/v1/foods)
+  Future<void> fetchFoods({String? search, String? category}) async {
+    _isLoadingFoods = true;
+    notifyListeners();
+
+    final response = await _restaurantService.getFoods(
+      search: search,
+      category: category,
+    );
+
+    if (response.success && response.data != null && response.data!.isNotEmpty) {
+      _foods.clear();
+      // Ensure each food has restaurant name & delivery time attached
+      for (final f in response.data!) {
+        final rName = (f.restaurantName != null && f.restaurantName!.isNotEmpty)
+            ? f.restaurantName
+            : getRestaurantName(f.restaurantId);
+        final rTime = (f.restaurantDeliveryTime != null && f.restaurantDeliveryTime!.isNotEmpty)
+            ? f.restaurantDeliveryTime
+            : getRestaurantDeliveryTime(f.restaurantId);
+        final rRating = f.restaurantRating ?? getRestaurantRating(f.restaurantId);
+
+        _foods.add(
+          f.copyWith(
+            restaurantName: rName,
+            restaurantDeliveryTime: rTime,
+            restaurantRating: rRating,
+          ),
+        );
+      }
+    } else {
+      // If backend foods endpoint is empty or offline, fallback to hotel menus
+      if (_foods.isEmpty) {
+        _populateFallbackFoods();
+      }
+    }
+
+    _isLoadingFoods = false;
     notifyListeners();
   }
 
