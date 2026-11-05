@@ -29,10 +29,21 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   Timer? _refreshTimer;
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+  String _selectedCategoryFilter = 'All';
 
   @override
   void initState() {
     super.initState();
+    _searchController.addListener(() {
+      final text = _searchController.text.trim();
+      if (text != _searchQuery) {
+        setState(() {
+          _searchQuery = text;
+        });
+      }
+    });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<DeliveryProvider>().fetchDeliveries();
       context.read<NotificationProvider>().fetchNotifications();
@@ -48,6 +59,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   void dispose() {
+    _searchController.dispose();
     _refreshTimer?.cancel();
     super.dispose();
   }
@@ -732,7 +744,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // ---------------------------------------------------------------------------
-  // Search Bar matching screenshot (Compact Height 44)
+  // Interactive Search Bar with instant filtering and category filter modal
   // ---------------------------------------------------------------------------
   Widget _buildSearchBar(BuildContext context) {
     return Container(
@@ -757,36 +769,69 @@ class _HomeScreenState extends State<HomeScreen> {
             size: 20,
           ),
           const SizedBox(width: 8),
-          const Expanded(
-            child: Text(
-              'Search food or restaurant',
-              style: TextStyle(
-                color: Color(0xFF64748B),
+          Expanded(
+            child: TextField(
+              controller: _searchController,
+              textInputAction: TextInputAction.search,
+              style: const TextStyle(
+                color: Color(0xFF0F172A),
                 fontSize: 13,
-                fontWeight: FontWeight.w500,
+                fontWeight: FontWeight.w600,
+              ),
+              decoration: InputDecoration(
+                hintText: _selectedCategoryFilter == 'All'
+                    ? 'Search food or restaurant...'
+                    : 'Search $_selectedCategoryFilter...',
+                hintStyle: const TextStyle(
+                  color: Color(0xFF94A3B8),
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                ),
+                isDense: true,
+                contentPadding: EdgeInsets.zero,
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
               ),
             ),
           ),
+          if (_searchQuery.isNotEmpty) ...[
+            InkWell(
+              onTap: () {
+                _searchController.clear();
+              },
+              borderRadius: BorderRadius.circular(12),
+              child: const Padding(
+                padding: EdgeInsets.all(4.0),
+                child: Icon(
+                  Icons.close_rounded,
+                  color: Color(0xFF94A3B8),
+                  size: 17,
+                ),
+              ),
+            ),
+            const SizedBox(width: 4),
+          ],
           InkWell(
             onTap: () {
-              // Open delivery request
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const CreateDeliveryScreen()),
-              );
+              _showFilterModal(context);
             },
             borderRadius: BorderRadius.circular(15),
             child: Container(
               width: 30,
               height: 30,
-              decoration: const BoxDecoration(
-                color: Color(0xFF0D5BFF),
+              decoration: BoxDecoration(
+                color: _selectedCategoryFilter != 'All'
+                    ? const Color(0xFF00E5FF)
+                    : const Color(0xFF0D5BFF),
                 shape: BoxShape.circle,
               ),
-              child: const Center(
+              child: Center(
                 child: Icon(
                   Icons.tune_rounded,
-                  color: Colors.white,
+                  color: _selectedCategoryFilter != 'All'
+                      ? const Color(0xFF0A2668)
+                      : Colors.white,
                   size: 16,
                 ),
               ),
@@ -794,6 +839,108 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  void _showFilterModal(BuildContext context) {
+    final categories = [
+      'All',
+      'Haniid & Roasts',
+      'Tibs & Grills',
+      'Traditional & Stews',
+      'Breakfast (Ciree)',
+      'Rice Dishes',
+      'Pizzas',
+      'Burgers & Sandwiches',
+      'Fast Foods',
+      'Drinks & Juices',
+      'Hot Drinks & Coffee',
+    ];
+
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Container(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFCBD5E1),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Filter Menu by Category',
+                        style: TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF0F172A),
+                        ),
+                      ),
+                      if (_selectedCategoryFilter != 'All')
+                        TextButton(
+                          onPressed: () {
+                            setModalState(() {
+                              _selectedCategoryFilter = 'All';
+                            });
+                            setState(() {
+                              _selectedCategoryFilter = 'All';
+                            });
+                          },
+                          child: const Text('Reset'),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: categories.map((cat) {
+                      final isSelected = _selectedCategoryFilter == cat;
+                      return ChoiceChip(
+                        label: Text(cat),
+                        selected: isSelected,
+                        selectedColor: const Color(0xFF0D5BFF),
+                        labelStyle: TextStyle(
+                          color: isSelected ? Colors.white : const Color(0xFF334155),
+                          fontWeight: FontWeight.w700,
+                          fontSize: 12,
+                        ),
+                        backgroundColor: const Color(0xFFF1F5F9),
+                        onSelected: (selected) {
+                          setModalState(() {
+                            _selectedCategoryFilter = selected ? cat : 'All';
+                          });
+                          setState(() {
+                            _selectedCategoryFilter = selected ? cat : 'All';
+                          });
+                          Navigator.pop(ctx);
+                        },
+                      );
+                    }).toList(),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
     );
   }
 
@@ -1089,8 +1236,27 @@ class _HomeScreenState extends State<HomeScreen> {
   // ---------------------------------------------------------------------------
   Widget _buildPopularFoodSection(BuildContext context) {
     final restaurantProvider = context.watch<RestaurantProvider>();
-    final foods = restaurantProvider.foods;
-    final isLoading = restaurantProvider.isLoadingFoods && foods.isEmpty;
+    final allFoods = restaurantProvider.foods;
+    final isLoading = restaurantProvider.isLoadingFoods && allFoods.isEmpty;
+
+    // Filter foods by instant search query and selected category
+    final foods = allFoods.where((f) {
+      final rName = (f.restaurantName != null && f.restaurantName!.isNotEmpty)
+          ? f.restaurantName!
+          : restaurantProvider.getRestaurantName(f.restaurantId);
+
+      final matchesQuery = _searchQuery.isEmpty ||
+          f.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+          rName.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+          (f.category != null && f.category!.toLowerCase().contains(_searchQuery.toLowerCase())) ||
+          (f.description != null && f.description!.toLowerCase().contains(_searchQuery.toLowerCase()));
+
+      final matchesCategory = _selectedCategoryFilter == 'All' ||
+          (f.category != null &&
+              f.category!.toLowerCase().contains(_selectedCategoryFilter.toLowerCase()));
+
+      return matchesQuery && matchesCategory;
+    }).toList();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1099,14 +1265,44 @@ class _HomeScreenState extends State<HomeScreen> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Text(
-              'Popular food',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w800,
-                color: Color(0xFF0F172A),
-                letterSpacing: -0.4,
-              ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _searchQuery.isNotEmpty
+                      ? 'Search results (${foods.length})'
+                      : (_selectedCategoryFilter != 'All'
+                          ? '$_selectedCategoryFilter (${foods.length})'
+                          : 'Popular food'),
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF0F172A),
+                    letterSpacing: -0.4,
+                  ),
+                ),
+                if (_searchQuery.isNotEmpty || _selectedCategoryFilter != 'All')
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2.0),
+                    child: InkWell(
+                      onTap: () {
+                        setState(() {
+                          _searchController.clear();
+                          _searchQuery = '';
+                          _selectedCategoryFilter = 'All';
+                        });
+                      },
+                      child: const Text(
+                        'Clear filters',
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF0D5BFF),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
             ),
             InkWell(
               onTap: () => _openCategory(context, category: DeliveryCategory.food, itemType: 'Food & Groceries'),
@@ -1142,16 +1338,33 @@ class _HomeScreenState extends State<HomeScreen> {
         else if (foods.isEmpty)
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+            padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 16),
             decoration: BoxDecoration(
               color: const Color(0xFFF8FAFC),
               borderRadius: BorderRadius.circular(16),
               border: Border.all(color: const Color(0xFFE2E8F0)),
             ),
-            child: const Center(
-              child: Text(
-                'No partner food items available right now.',
-                style: TextStyle(color: Color(0xFF64748B), fontSize: 13, fontWeight: FontWeight.w600),
+            child: Center(
+              child: Column(
+                children: [
+                  const Icon(
+                    Icons.search_off_rounded,
+                    size: 36,
+                    color: Color(0xFF94A3B8),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    _searchQuery.isNotEmpty
+                        ? 'No dishes matching "$_searchQuery"'
+                        : 'No dishes available in $_selectedCategoryFilter right now.',
+                    style: const TextStyle(
+                      color: Color(0xFF64748B),
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
               ),
             ),
           )
