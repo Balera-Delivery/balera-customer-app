@@ -497,243 +497,354 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // ---------------------------------------------------------------------------
-  // Hero Card matching Screenshot (Medium, streamlined height)
+  // Hero Card matching Screenshot (Interactive with Order Tracking)
   // ---------------------------------------------------------------------------
   Widget _buildBaleraDeliveryHeroCard(
     BuildContext context,
     DeliveryModel? delivery,
     bool hasActive,
   ) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
-      decoration: BoxDecoration(
-        color: const Color(0xFF0038A8).withValues(alpha: 0.45),
+    final statusColor = hasActive ? const Color(0xFF00E5FF) : Colors.white;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () {
+          _openTrackOrder(context, delivery);
+        },
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: Colors.white.withValues(alpha: 0.20),
-          width: 1.0,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF002B82).withValues(alpha: 0.20),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Row 1: Pill Badge "Express Courier ● Active 24/7" + Arrow Button ↗
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3.5),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.20),
-                    width: 1,
-                  ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Text(
-                      'Express Courier',
-                      style: TextStyle(
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white,
-                      ),
-                    ),
-                    const SizedBox(width: 5),
-                    Container(
-                      width: 4.5,
-                      height: 4.5,
-                      decoration: const BoxDecoration(
-                        color: Color(0xFF00E5FF),
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                    const SizedBox(width: 4),
-                    const Text(
-                      'Active 24/7',
-                      style: TextStyle(
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              // Arrow Action Button ↗
-              InkWell(
-                onTap: () {
-                  if (hasActive) {
-                    _openTrackOrder(context, delivery);
-                  } else {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const CreateDeliveryScreen()),
-                    );
-                  }
-                },
-                borderRadius: BorderRadius.circular(8),
-                child: Container(
-                  width: 28,
-                  height: 28,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF0D5BFF),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.25),
-                      width: 1,
-                    ),
-                  ),
-                  child: const Center(
-                    child: Icon(
-                      Icons.north_east_rounded,
-                      color: Colors.white,
-                      size: 16,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 7),
-
-          // Title "Balera Delivery"
-          const Text(
-            'Balera Delivery',
-            style: TextStyle(
-              fontSize: 19,
-              fontWeight: FontWeight.w900,
-              color: Colors.white,
-              letterSpacing: -0.3,
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+          decoration: BoxDecoration(
+            color: const Color(0xFF0038A8).withValues(alpha: 0.45),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+              color: hasActive
+                  ? const Color(0xFF00E5FF).withValues(alpha: 0.45)
+                  : Colors.white.withValues(alpha: 0.20),
+              width: 1.0,
             ),
-          ),
-
-          const SizedBox(height: 7),
-
-          // Sub-row: "Instant Pickup" on left, "Doorstep Dropoff" on right
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                hasActive && delivery?.pickupLocation.isNotEmpty == true
-                    ? delivery!.pickupLocation
-                    : 'Instant Pickup',
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.white.withValues(alpha: 0.90),
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-              Text(
-                hasActive && delivery?.destination.isNotEmpty == true
-                    ? delivery!.destination
-                    : 'Doorstep Dropoff',
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.white.withValues(alpha: 0.90),
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF002B82).withValues(alpha: 0.20),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
               ),
             ],
           ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Row 1: Pill Badge "Express Courier ● Active 24/7" (or Tracking #) + Arrow Button ↗
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3.5),
+                    decoration: BoxDecoration(
+                      color: hasActive
+                          ? const Color(0xFF00E5FF).withValues(alpha: 0.20)
+                          : Colors.white.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: hasActive
+                            ? const Color(0xFF00E5FF).withValues(alpha: 0.50)
+                            : Colors.white.withValues(alpha: 0.20),
+                        width: 1,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          hasActive
+                              ? 'Live Order ${delivery?.trackingCode != null ? "#${delivery!.trackingCode}" : "Active"}'
+                              : 'Express Courier',
+                          style: TextStyle(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w700,
+                            color: hasActive ? const Color(0xFF00E5FF) : Colors.white,
+                          ),
+                        ),
+                        const SizedBox(width: 5),
+                        Container(
+                          width: 5,
+                          height: 5,
+                          decoration: BoxDecoration(
+                            color: hasActive ? const Color(0xFF00E5FF) : const Color(0xFF00E5FF),
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          hasActive
+                              ? AppConstants.formatStatus(delivery?.status ?? 'ONGOING')
+                              : 'Active 24/7',
+                          style: const TextStyle(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
 
-          const SizedBox(height: 7),
+                  // Arrow / Track Action Button ↗
+                  Container(
+                    width: 28,
+                    height: 28,
+                    decoration: BoxDecoration(
+                      color: hasActive ? const Color(0xFF00E5FF) : const Color(0xFF0D5BFF),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.25),
+                        width: 1,
+                      ),
+                    ),
+                    child: Center(
+                      child: Icon(
+                        Icons.north_east_rounded,
+                        color: hasActive ? const Color(0xFF0A2668) : Colors.white,
+                        size: 16,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
 
-          // Stepper Line matching screenshot
-          _buildHeroStepper(),
-        ],
+              const SizedBox(height: 7),
+
+              // Title "Balera Delivery" + Status subtitle
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Balera Delivery',
+                    style: TextStyle(
+                      fontSize: 19,
+                      fontWeight: FontWeight.w900,
+                      color: Colors.white,
+                      letterSpacing: -0.3,
+                    ),
+                  ),
+                  if (hasActive)
+                    Row(
+                      children: [
+                        const Icon(Icons.my_location_rounded, size: 12, color: Color(0xFF00E5FF)),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Tap to track',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: const Color(0xFF00E5FF).withValues(alpha: 0.95),
+                          ),
+                        ),
+                      ],
+                    ),
+                ],
+              ),
+
+              const SizedBox(height: 7),
+
+              // Sub-row: "Instant Pickup" on left, "Doorstep Dropoff" on right
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.circle,
+                          size: 7,
+                          color: hasActive ? const Color(0xFF00E5FF) : Colors.white.withValues(alpha: 0.8),
+                        ),
+                        const SizedBox(width: 5),
+                        Flexible(
+                          child: Text(
+                            hasActive && delivery?.pickupLocation.isNotEmpty == true
+                                ? delivery!.pickupLocation
+                                : 'Instant Pickup',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white.withValues(alpha: 0.90),
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        Flexible(
+                          child: Text(
+                            hasActive && delivery?.destination.isNotEmpty == true
+                                ? delivery!.destination
+                                : 'Doorstep Dropoff',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white.withValues(alpha: 0.90),
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            textAlign: TextAlign.end,
+                          ),
+                        ),
+                        const SizedBox(width: 5),
+                        Icon(
+                          Icons.location_on,
+                          size: 11,
+                          color: hasActive ? const Color(0xFF00E5FF) : Colors.white.withValues(alpha: 0.8),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 7),
+
+              // Dynamic Stepper matching order progress
+              _buildHeroStepper(delivery, hasActive),
+            ],
+          ),
+        ),
       ),
     );
   }
 
-  // Stepper Line matching screenshot exactly
-  Widget _buildHeroStepper() {
+  // Stepper Line dynamically reflecting real delivery state or default progression
+  Widget _buildHeroStepper([DeliveryModel? delivery, bool hasActive = false]) {
+    // Stage indexes:
+    // 0 = Order Placed / Pending
+    // 1 = Accepted / Assigned to Rider
+    // 2 = Picked Up / On The Way
+    // 3 = Arrived / Delivered
+    int currentStage = 0;
+    if (hasActive && delivery != null) {
+      final status = delivery.status.toUpperCase();
+      if (status == AppConstants.statusDelivered || status == 'COMPLETED') {
+        currentStage = 3;
+      } else if (status == AppConstants.statusOnTheWay || status == AppConstants.statusPickedUp) {
+        currentStage = 2;
+      } else if (status == AppConstants.statusAssigned || status == AppConstants.statusArrivedAtPickup) {
+        currentStage = 1;
+      } else {
+        currentStage = 0;
+      }
+    } else {
+      // Default idle illustration matching screenshot (stage 2 active on bike)
+      currentStage = 2;
+    }
+
+    final isStep1Active = currentStage >= 0;
+    final isStep2Active = currentStage >= 1;
+    final isStep3Active = currentStage >= 2;
+    final isStep4Active = currentStage >= 3;
+
     return Row(
       children: [
-        // 1. Check circle 1
+        // 1. Order Placed / Instant Pickup
         Container(
           width: 20,
           height: 20,
-          decoration: const BoxDecoration(
-            color: Color(0xFF0D5BFF),
+          decoration: BoxDecoration(
+            color: isStep1Active ? const Color(0xFF0D5BFF) : Colors.white.withValues(alpha: 0.20),
             shape: BoxShape.circle,
+            border: Border.all(
+              color: isStep1Active ? const Color(0xFF00E5FF) : Colors.transparent,
+              width: 1.2,
+            ),
           ),
           child: const Center(
             child: Icon(Icons.check_rounded, color: Colors.white, size: 13),
           ),
         ),
 
-        // Dotted connector
-        Expanded(child: _buildDottedLine()),
+        // Dotted connector 1
+        Expanded(child: _buildDottedLine(isStep2Active)),
 
-        // 2. Check circle 2
+        // 2. Rider Assigned / Confirmed
         Container(
           width: 20,
           height: 20,
-          decoration: const BoxDecoration(
-            color: Color(0xFF0D5BFF),
+          decoration: BoxDecoration(
+            color: isStep2Active ? const Color(0xFF0D5BFF) : Colors.white.withValues(alpha: 0.20),
             shape: BoxShape.circle,
+            border: Border.all(
+              color: isStep2Active ? const Color(0xFF00E5FF) : Colors.transparent,
+              width: 1.2,
+            ),
           ),
-          child: const Center(
-            child: Icon(Icons.check_rounded, color: Colors.white, size: 13),
-          ),
-        ),
-
-        // Dotted connector
-        Expanded(child: _buildDottedLine()),
-
-        // 3. Motorcycle Rider circle (Cyan with dark blue icon matching screenshot)
-        Container(
-          width: 22,
-          height: 22,
-          decoration: const BoxDecoration(
-            color: Color(0xFF00E5FF),
-            shape: BoxShape.circle,
-          ),
-          child: const Center(
+          child: Center(
             child: Icon(
-              Icons.two_wheeler_rounded,
-              color: Color(0xFF0A2668),
-              size: 14,
+              isStep2Active ? Icons.check_rounded : Icons.circle,
+              color: Colors.white,
+              size: isStep2Active ? 13 : 6,
             ),
           ),
         ),
 
-        // Dotted connector
-        Expanded(child: _buildDottedLine()),
+        // Dotted connector 2
+        Expanded(child: _buildDottedLine(isStep3Active)),
 
-        // 4. Target Double Ring circle
+        // 3. Motorcycle Rider circle (Cyan when on the way)
+        Container(
+          width: 23,
+          height: 23,
+          decoration: BoxDecoration(
+            color: isStep3Active ? const Color(0xFF00E5FF) : Colors.white.withValues(alpha: 0.20),
+            shape: BoxShape.circle,
+            boxShadow: isStep3Active
+                ? [
+                    BoxShadow(
+                      color: const Color(0xFF00E5FF).withValues(alpha: 0.40),
+                      blurRadius: 6,
+                      spreadRadius: 1,
+                    ),
+                  ]
+                : null,
+          ),
+          child: Center(
+            child: Icon(
+              Icons.two_wheeler_rounded,
+              color: isStep3Active ? const Color(0xFF0A2668) : Colors.white.withValues(alpha: 0.7),
+              size: 15,
+            ),
+          ),
+        ),
+
+        // Dotted connector 3
+        Expanded(child: _buildDottedLine(isStep4Active)),
+
+        // 4. Target Destination / Doorstep Dropoff
         Container(
           width: 20,
           height: 20,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            border: Border.all(color: Colors.white, width: 2),
+            color: isStep4Active ? const Color(0xFF00E5FF) : Colors.transparent,
+            border: Border.all(
+              color: isStep4Active ? const Color(0xFF00E5FF) : Colors.white,
+              width: 2,
+            ),
           ),
           child: Center(
             child: Container(
               width: 6,
               height: 6,
-              decoration: const BoxDecoration(
-                color: Colors.white,
+              decoration: BoxDecoration(
+                color: isStep4Active ? const Color(0xFF0A2668) : Colors.white,
                 shape: BoxShape.circle,
               ),
             ),
@@ -743,9 +854,31 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // Interactive Search Bar with instant filtering and category filter modal
-  // ---------------------------------------------------------------------------
+  Widget _buildDottedLine([bool isActive = false]) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4.0),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final count = (constraints.maxWidth / 6).floor().clamp(2, 10);
+          return Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: List.generate(count, (_) {
+              return Container(
+                width: 3,
+                height: 3,
+                decoration: BoxDecoration(
+                  color: isActive
+                      ? const Color(0xFF00E5FF).withValues(alpha: 0.85)
+                      : Colors.white.withValues(alpha: 0.45),
+                  shape: BoxShape.circle,
+                ),
+              );
+            }),
+          );
+        },
+      ),
+    );
+  }
   Widget _buildSearchBar(BuildContext context) {
     return Container(
       height: 44,
@@ -941,30 +1074,6 @@ class _HomeScreenState extends State<HomeScreen> {
           },
         );
       },
-    );
-  }
-
-  Widget _buildDottedLine() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 4.0),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final count = (constraints.maxWidth / 6).floor().clamp(2, 10);
-          return Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: List.generate(count, (_) {
-              return Container(
-                width: 3,
-                height: 3,
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.55),
-                  shape: BoxShape.circle,
-                ),
-              );
-            }),
-          );
-        },
-      ),
     );
   }
 
