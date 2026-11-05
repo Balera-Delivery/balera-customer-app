@@ -13,11 +13,15 @@ class RestaurantService {
     String? search,
     String? category,
     String? cuisineType,
+    int page = 1,
+    int limit = 100,
   }) async {
     try {
       final response = await _client.dio.get(
         ApiEndpoints.restaurants,
         queryParameters: {
+          'page': page,
+          'limit': limit,
           if (search != null && search.trim().isNotEmpty) 'search': search.trim(),
           if (category != null && category.trim().isNotEmpty && category != 'All') 'category': category.trim(),
           if (cuisineType != null && cuisineType.trim().isNotEmpty) 'cuisineType': cuisineType.trim(),
@@ -76,11 +80,15 @@ class RestaurantService {
     String? restaurantId,
     String? category,
     bool? isAvailable,
+    int page = 1,
+    int limit = 200,
   }) async {
     try {
       final response = await _client.dio.get(
         ApiEndpoints.foods,
         queryParameters: {
+          'page': page,
+          'limit': limit,
           if (search != null && search.trim().isNotEmpty) 'search': search.trim(),
           if (restaurantId != null && restaurantId.trim().isNotEmpty) 'restaurantId': restaurantId.trim(),
           if (category != null && category.trim().isNotEmpty) 'category': category.trim(),

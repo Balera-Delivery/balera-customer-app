@@ -1159,7 +1159,7 @@ class _HomeScreenState extends State<HomeScreen> {
           GridView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
-            itemCount: foods.length.clamp(0, 10),
+            itemCount: foods.length,
             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 2,
               crossAxisSpacing: 14,
