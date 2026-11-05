@@ -388,13 +388,13 @@ class _HomeScreenState extends State<HomeScreen> {
               children: [
                 Row(
                   children: [
-                    // Circular Avatar with letter 'B' matching screenshot
+                    // Circular Avatar with official Balera Logo
                     Container(
                       width: 38,
                       height: 38,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: const Color(0xFF0A2668),
+                        color: Colors.white,
                         border: Border.all(color: Colors.white, width: 2.0),
                         boxShadow: [
                           BoxShadow(
@@ -404,13 +404,25 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                         ],
                       ),
-                      child: const Center(
-                        child: Text(
-                          'B',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w900,
-                            fontSize: 16,
+                      child: ClipOval(
+                        child: Padding(
+                          padding: const EdgeInsets.all(2.0),
+                          child: Image.asset(
+                            'assets/logo/balera_logo.png',
+                            fit: BoxFit.contain,
+                            errorBuilder: (_, __, ___) => Container(
+                              color: const Color(0xFF0A2668),
+                              child: const Center(
+                                child: Text(
+                                  'B',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w900,
+                                    fontSize: 16,
+                                  ),
+                                ),
+                              ),
+                            ),
                           ),
                         ),
                       ),
