@@ -26,16 +26,14 @@ class ProfileScreen extends StatelessWidget {
       ),
       child: Scaffold(
         backgroundColor: const Color(0xFFF8FAFC),
-        body: SingleChildScrollView(
-          padding: EdgeInsets.zero,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Top Curved Royal Blue Header
-              _buildTopHeader(context, user),
+        body: Column(
+          children: [
+            // Fixed in place top header
+            _buildTopHeader(context, user),
 
-              // Content Area
-              Padding(
+            // Scrollable body content below fixed header
+            Expanded(
+              child: SingleChildScrollView(
                 padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 24.0),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -215,8 +213,8 @@ class ProfileScreen extends StatelessWidget {
                   ],
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
