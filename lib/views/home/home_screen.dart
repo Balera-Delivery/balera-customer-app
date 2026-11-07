@@ -919,21 +919,21 @@ class _HomeScreenState extends State<HomeScreen> {
     // 1 = Accepted / Assigned to Rider
     // 2 = Picked Up / On The Way
     // 3 = Arrived / Delivered
-    int currentStage = 0;
+    int currentStage = -1; // -1 means no active delivery
     if (hasActive && delivery != null) {
       final status = delivery.status.toUpperCase();
       if (status == AppConstants.statusDelivered || status == 'COMPLETED') {
         currentStage = 3;
       } else if (status == AppConstants.statusOnTheWay || status == AppConstants.statusPickedUp) {
         currentStage = 2;
-      } else if (status == AppConstants.statusAssigned || status == AppConstants.statusArrivedAtPickup) {
+      } else if (status == AppConstants.statusAssigned || status == AppConstants.statusArrivedAtPickup || status == AppConstants.statusAccepted) {
         currentStage = 1;
       } else {
-        currentStage = 0;
+        currentStage = 0; // Order placed / Pending
       }
     } else {
-      // Default idle illustration matching screenshot (stage 2 active on bike)
-      currentStage = 2;
+      // Idle state: no active order
+      currentStage = -1;
     }
 
     final isStep1Active = currentStage >= 0;
