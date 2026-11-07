@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../core/utils/partner_product_rotation_util.dart';
 import '../data/fallback_hotel_data.dart';
 import '../models/food_item_model.dart';
 import '../models/restaurant_model.dart';
@@ -36,6 +37,17 @@ class RestaurantProvider extends ChangeNotifier {
 
   List<RestaurantModel> get restaurants => _restaurants;
   List<FoodItemModel> get foods => _foods;
+
+  /// Fair Partner Product Rotation feed:
+  /// Ensures all active food partners receive balanced, fair visibility throughout the feed
+  /// with deterministic daily rotation, no consecutive partner products, and priority diversity.
+  List<FoodItemModel> get rotatedFoods {
+    return PartnerProductRotationUtil.rotateProducts(
+      foods: _foods,
+      restaurants: _restaurants,
+    );
+  }
+
   RestaurantModel? get selectedRestaurant => _selectedRestaurant;
   FoodItemModel? get selectedFoodItem => _selectedFoodItem;
   int get selectedQuantity => _selectedQuantity;

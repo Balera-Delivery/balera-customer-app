@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/utils/formatters.dart';
+import '../../core/utils/partner_product_rotation_util.dart';
 import '../../core/widgets/balera_logo.dart';
 import '../../core/widgets/status_badge.dart';
 import '../../models/delivery_model.dart';
@@ -1537,8 +1538,8 @@ class _HomeScreenState extends State<HomeScreen> {
     final allFoods = restaurantProvider.foods;
     final isLoading = restaurantProvider.isLoadingFoods && allFoods.isEmpty;
 
-    // Filter foods by instant search query and selected category
-    final foods = allFoods.where((f) {
+    // Filter candidate foods by instant search query and selected category first
+    final candidateFoods = allFoods.where((f) {
       final rName = (f.restaurantName != null && f.restaurantName!.isNotEmpty)
           ? f.restaurantName!
           : restaurantProvider.getRestaurantName(f.restaurantId);
@@ -1555,6 +1556,12 @@ class _HomeScreenState extends State<HomeScreen> {
 
       return matchesQuery && matchesCategory;
     }).toList();
+
+    // Apply Fair Partner Product Rotation algorithm to ensure equal exposure across active partners
+    final foods = PartnerProductRotationUtil.rotateProducts(
+      foods: candidateFoods,
+      restaurants: restaurantProvider.restaurants,
+    );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
