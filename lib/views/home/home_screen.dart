@@ -415,12 +415,16 @@ class _HomeScreenState extends State<HomeScreen> {
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
                                         Text(
-                                          '$count ${count == 1 ? "dish" : "dishes"} selected',
+                                          restProv.distinctPartnerCount > 1
+                                              ? '$count dishes (${restProv.distinctPartnerCount} partners)'
+                                              : '$count ${count == 1 ? "dish" : "dishes"} selected',
                                           style: const TextStyle(
                                             fontSize: 13.5,
                                             fontWeight: FontWeight.w800,
                                             color: Colors.white,
                                           ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
                                         ),
                                         Text(
                                           '${totalPrice.toStringAsFixed(0)} Birr total',

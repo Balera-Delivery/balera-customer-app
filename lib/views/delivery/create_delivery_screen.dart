@@ -1467,7 +1467,7 @@ class _CreateDeliveryScreenState extends State<CreateDeliveryScreen> {
 
             if (restaurantProvider.cart.isNotEmpty) ...[
               const SizedBox(height: 14),
-              // Multi-Item Cart Summary Box
+              // Multi-Item Cart Summary Box grouped by Partner
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(14),
@@ -1507,9 +1507,11 @@ class _CreateDeliveryScreenState extends State<CreateDeliveryScreen> {
                               ),
                             ),
                             const SizedBox(width: 8),
-                            const Text(
-                              'Selected Dishes:',
-                              style: TextStyle(
+                            Text(
+                              restaurantProvider.distinctPartnerCount > 1
+                                  ? 'Selected (${restaurantProvider.distinctPartnerCount} Partners):'
+                                  : 'Selected Dishes:',
+                              style: const TextStyle(
                                 fontSize: 13.5,
                                 fontWeight: FontWeight.w800,
                                 color: Color(0xFF0F172A),
@@ -1528,81 +1530,136 @@ class _CreateDeliveryScreenState extends State<CreateDeliveryScreen> {
                       ],
                     ),
                     const SizedBox(height: 10),
-                    ...restaurantProvider.cartItems.map((cartItem) {
-                      return Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 4.0),
-                        child: Row(
+
+                    // Group by partner so dishes from different partners are clearly labeled
+                    ...restaurantProvider.cartItemsByPartner.entries.map((entry) {
+                      final partnerName = entry.key;
+                      final partnerItems = entry.value;
+                      final partnerSubtotal = partnerItems.fold(0.0, (sum, i) => sum + i.totalPrice);
+
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 10),
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF8FAFC),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFFE2E8F0)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Expanded(
-                              child: Text(
-                                cartItem.food.name,
-                                style: const TextStyle(
-                                  fontSize: 12.5,
-                                  fontWeight: FontWeight.w700,
-                                  color: Color(0xFF334155),
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                            Text(
-                              '${cartItem.totalPrice.toStringAsFixed(0)} Birr',
-                              style: const TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: Color(0xFF64748B),
-                              ),
-                            ),
-                            const SizedBox(width: 10),
+                            // Partner Header Pill
                             Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                InkWell(
-                                  onTap: () {
-                                    HapticFeedback.lightImpact();
-                                    restaurantProvider.removeFromCart(cartItem.food.id);
-                                    _syncFromRestaurantProvider(restaurantProvider);
-                                  },
-                                  borderRadius: BorderRadius.circular(10),
-                                  child: Container(
-                                    width: 24,
-                                    height: 24,
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFFF1F5F9),
-                                      borderRadius: BorderRadius.circular(8),
+                                Row(
+                                  children: [
+                                    const Icon(Icons.storefront_rounded, size: 14, color: Color(0xFF0052EA)),
+                                    const SizedBox(width: 5),
+                                    Text(
+                                      partnerName,
+                                      style: const TextStyle(
+                                        fontSize: 12.5,
+                                        fontWeight: FontWeight.w800,
+                                        color: Color(0xFF0052EA),
+                                      ),
                                     ),
-                                    child: const Center(
-                                      child: Icon(Icons.remove, size: 14, color: Color(0xFF0052EA)),
-                                    ),
-                                  ),
+                                  ],
                                 ),
-                                Padding(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                                  child: Text(
-                                    '${cartItem.quantity}',
-                                    style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800),
-                                  ),
-                                ),
-                                InkWell(
-                                  onTap: () {
-                                    HapticFeedback.lightImpact();
-                                    restaurantProvider.addToCart(cartItem.food);
-                                    _syncFromRestaurantProvider(restaurantProvider);
-                                  },
-                                  borderRadius: BorderRadius.circular(10),
-                                  child: Container(
-                                    width: 24,
-                                    height: 24,
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFFEFF6FF),
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: const Center(
-                                      child: Icon(Icons.add, size: 14, color: Color(0xFF0052EA)),
-                                    ),
+                                Text(
+                                  '${partnerSubtotal.toStringAsFixed(0)} Birr',
+                                  style: const TextStyle(
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w700,
+                                    color: Color(0xFF64748B),
                                   ),
                                 ),
                               ],
                             ),
+                            const Divider(height: 12, thickness: 0.8, color: Color(0xFFE2E8F0)),
+
+                            // Dishes for this partner
+                            ...partnerItems.map((cartItem) {
+                              return Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 3.0),
+                                child: Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        cartItem.food.name,
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w700,
+                                          color: Color(0xFF334155),
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                    Text(
+                                      '${cartItem.totalPrice.toStringAsFixed(0)} Birr',
+                                      style: const TextStyle(
+                                        fontSize: 11.5,
+                                        fontWeight: FontWeight.w600,
+                                        color: Color(0xFF64748B),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Row(
+                                      children: [
+                                        InkWell(
+                                          onTap: () {
+                                            HapticFeedback.lightImpact();
+                                            restaurantProvider.removeFromCart(cartItem.food.id);
+                                            _syncFromRestaurantProvider(restaurantProvider);
+                                          },
+                                          borderRadius: BorderRadius.circular(8),
+                                          child: Container(
+                                            width: 22,
+                                            height: 22,
+                                            decoration: BoxDecoration(
+                                              color: Colors.white,
+                                              borderRadius: BorderRadius.circular(6),
+                                              border: Border.all(color: const Color(0xFFCBD5E1)),
+                                            ),
+                                            child: const Center(
+                                              child: Icon(Icons.remove, size: 12, color: Color(0xFF0052EA)),
+                                            ),
+                                          ),
+                                        ),
+                                        Padding(
+                                          padding: const EdgeInsets.symmetric(horizontal: 6),
+                                          child: Text(
+                                            '${cartItem.quantity}',
+                                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800),
+                                          ),
+                                        ),
+                                        InkWell(
+                                          onTap: () {
+                                            HapticFeedback.lightImpact();
+                                            restaurantProvider.addToCart(cartItem.food);
+                                            _syncFromRestaurantProvider(restaurantProvider);
+                                          },
+                                          borderRadius: BorderRadius.circular(8),
+                                          child: Container(
+                                            width: 22,
+                                            height: 22,
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFFEFF6FF),
+                                              borderRadius: BorderRadius.circular(6),
+                                              border: Border.all(color: const Color(0xFFBFDBFE)),
+                                            ),
+                                            child: const Center(
+                                              child: Icon(Icons.add, size: 12, color: Color(0xFF0052EA)),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              );
+                            }),
                           ],
                         ),
                       );

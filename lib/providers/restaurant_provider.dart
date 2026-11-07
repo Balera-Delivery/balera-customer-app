@@ -60,6 +60,21 @@ class RestaurantProvider extends ChangeNotifier {
   bool isFoodInCart(String foodId) => _cart.containsKey(foodId);
   int getFoodQuantityInCart(String foodId) => _cart[foodId]?.quantity ?? 0;
 
+  /// Cart items grouped by their partner restaurant name / id
+  Map<String, List<CartItem>> get cartItemsByPartner {
+    final Map<String, List<CartItem>> grouped = {};
+    for (final item in _cart.values) {
+      final pName = (item.food.restaurantName != null && item.food.restaurantName!.isNotEmpty)
+          ? item.food.restaurantName!
+          : getRestaurantName(item.food.restaurantId);
+      grouped.putIfAbsent(pName, () => []).add(item);
+    }
+    return grouped;
+  }
+
+  /// Number of distinct partners currently represented in the cart
+  int get distinctPartnerCount => cartItemsByPartner.keys.length;
+
   bool get isLoading => _isLoading;
   bool get isLoadingMenu => _isLoadingMenu;
   bool get isLoadingFoods => _isLoadingFoods;
@@ -380,15 +395,29 @@ class RestaurantProvider extends ChangeNotifier {
     }
 
     if (_cart.isNotEmpty) {
-      final itemsSummary = _cart.values.map((item) {
-        final q = item.quantity > 1 ? '${item.quantity}x ' : '';
-        return '$q${item.food.name}';
-      }).join(', ');
+      final grouped = cartItemsByPartner;
+      if (grouped.length == 1) {
+        final pName = grouped.keys.first;
+        final itemsSummary = grouped[pName]!.map((item) {
+          final q = item.quantity > 1 ? '${item.quantity}x ' : '';
+          return '$q${item.food.name}';
+        }).join(', ');
+        final totalPriceStr = '${totalCartPrice.toStringAsFixed(0)} Birr';
+        return '$itemsSummary (Total: $totalPriceStr) - $pName';
+      }
 
-      final restaurantName = _selectedRestaurant?.name ??
-          (_cart.values.first.food.restaurantName ?? 'Partner Restaurant');
+      // Multi-partner order summary
+      final List<String> partnerSummaries = [];
+      grouped.forEach((pName, items) {
+        final dishStr = items.map((i) {
+          final q = i.quantity > 1 ? '${i.quantity}x ' : '';
+          return '$q${i.food.name}';
+        }).join(', ');
+        partnerSummaries.add('[$pName]: $dishStr');
+      });
+
       final totalPriceStr = '${totalCartPrice.toStringAsFixed(0)} Birr';
-      return '$itemsSummary (Total: $totalPriceStr) - $restaurantName';
+      return '${partnerSummaries.join(' + ')} (Total: $totalPriceStr)';
     }
 
     if (_selectedFoodItem == null) {
