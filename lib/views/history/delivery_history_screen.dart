@@ -55,7 +55,14 @@ class _DeliveryHistoryScreenState extends State<DeliveryHistoryScreen> {
         body: Column(
           children: [
             // Fixed Top Curved Royal Blue Header
-            _buildCurvedHeader(context, list.length),
+            _buildCurvedHeader(
+              context,
+              list.length,
+              deliveryProvider.deliveries.length,
+              deliveryProvider.completedDeliveries.length,
+              deliveryProvider.ongoingDeliveries.length,
+              deliveryProvider.cancelledDeliveries.length,
+            ),
 
             // Scrollable Delivery Cards List with Pull-to-refresh
             Expanded(
@@ -92,17 +99,29 @@ class _DeliveryHistoryScreenState extends State<DeliveryHistoryScreen> {
   }
 
   // ---------------------------------------------------------------------------
-  // Top Royal Blue Curved Header with Filter Pills
+  // Top Royal Blue Curved Header with Professional Segmented Filter Buttons
   // ---------------------------------------------------------------------------
-  Widget _buildCurvedHeader(BuildContext context, int count) {
+  Widget _buildCurvedHeader(
+    BuildContext context,
+    int count,
+    int allCount,
+    int completedCount,
+    int inProgressCount,
+    int cancelledCount,
+  ) {
     final topPadding = MediaQuery.of(context).padding.top;
-    final filters = ['All', 'Completed', 'In Progress', 'Cancelled'];
+    final filters = [
+      {'name': 'All', 'count': allCount},
+      {'name': 'Completed', 'count': completedCount},
+      {'name': 'In Progress', 'count': inProgressCount},
+      {'name': 'Cancelled', 'count': cancelledCount},
+    ];
 
     return Container(
       width: double.infinity,
       padding: EdgeInsets.only(
         top: topPadding + 14,
-        bottom: 20,
+        bottom: 22,
       ),
       decoration: const BoxDecoration(
         gradient: LinearGradient(
@@ -131,82 +150,176 @@ class _DeliveryHistoryScreenState extends State<DeliveryHistoryScreen> {
           // Title & Count in Header
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                const Text(
-                  'My Deliveries',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w800,
-                    fontSize: 22,
-                    color: Colors.white,
-                    letterSpacing: -0.3,
-                  ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'My Deliveries',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 23,
+                        color: Colors.white,
+                        letterSpacing: -0.4,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '$count ${count == 1 ? 'delivery' : 'deliveries'}',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.white.withValues(alpha: 0.85),
+                        letterSpacing: 0.1,
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  '$count ${count == 1 ? 'delivery' : 'deliveries'}',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
-                    color: Colors.white.withValues(alpha: 0.85),
+                // Quick Filter Tag badge
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.18),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.35),
+                      width: 1,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 6,
+                        height: 6,
+                        decoration: const BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Color(0xFF00E5FF),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        _selectedFilter,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
             ),
           ),
 
-          const SizedBox(height: 16),
+          const SizedBox(height: 18),
 
-          // Horizontal Filter Pills inside the Blue Header
+          // Professional Filter Buttons row inside the Blue Header
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+            physics: const BouncingScrollPhysics(),
+            padding: const EdgeInsets.symmetric(horizontal: 18),
             child: Row(
               children: filters.map((filter) {
-                final isSelected = _selectedFilter == filter;
+                final filterName = filter['name'] as String;
+                final filterCount = filter['count'] as int;
+                final isSelected = _selectedFilter == filterName;
+
                 return Padding(
                   padding: const EdgeInsets.only(right: 8.0),
-                  child: InkWell(
-                    onTap: () {
-                      setState(() {
-                        _selectedFilter = filter;
-                      });
-                    },
-                    borderRadius: BorderRadius.circular(24),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: isSelected ? Colors.white : Colors.white.withValues(alpha: 0.16),
-                        borderRadius: BorderRadius.circular(24),
-                        border: Border.all(
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: () {
+                        HapticFeedback.selectionClick();
+                        setState(() {
+                          _selectedFilter = filterName;
+                        });
+                      },
+                      borderRadius: BorderRadius.circular(26),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 220),
+                        curve: Curves.easeInOut,
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+                        decoration: BoxDecoration(
                           color: isSelected
                               ? Colors.white
-                              : Colors.white.withValues(alpha: 0.35),
-                          width: 1,
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          if (isSelected) ...[
-                            const Icon(
-                              Icons.check,
-                              size: 14,
-                              color: Color(0xFF0052EA),
-                            ),
-                            const SizedBox(width: 4),
-                          ],
-                          Text(
-                            filter,
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-                              color: isSelected ? const Color(0xFF0052EA) : Colors.white,
-                            ),
+                              : Colors.white.withValues(alpha: 0.14),
+                          borderRadius: BorderRadius.circular(26),
+                          border: Border.all(
+                            color: isSelected
+                                ? Colors.white
+                                : Colors.white.withValues(alpha: 0.32),
+                            width: isSelected ? 1.5 : 1.0,
                           ),
-                        ],
+                          boxShadow: isSelected
+                              ? [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.14),
+                                    blurRadius: 10,
+                                    offset: const Offset(0, 4),
+                                  ),
+                                ]
+                              : [],
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (isSelected) ...[
+                              Container(
+                                width: 17,
+                                height: 17,
+                                decoration: const BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: Color(0xFF0052EA),
+                                ),
+                                child: const Center(
+                                  child: Icon(
+                                    Icons.check_rounded,
+                                    size: 11,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                            ],
+                            Text(
+                              filterName,
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                                color: isSelected ? const Color(0xFF0052EA) : Colors.white,
+                                letterSpacing: -0.2,
+                              ),
+                            ),
+                            if (filterCount > 0) ...[
+                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                                decoration: BoxDecoration(
+                                  color: isSelected
+                                      ? const Color(0xFF0052EA).withValues(alpha: 0.12)
+                                      : Colors.white.withValues(alpha: 0.22),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Text(
+                                  '$filterCount',
+                                  style: TextStyle(
+                                    fontSize: 10.5,
+                                    fontWeight: FontWeight.w800,
+                                    color: isSelected
+                                        ? const Color(0xFF0052EA)
+                                        : Colors.white,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
                       ),
                     ),
                   ),
