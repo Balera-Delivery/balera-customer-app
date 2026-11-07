@@ -351,7 +351,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       return Positioned(
                         left: 16,
                         right: 16,
-                        bottom: 14,
+                        bottom: 96, // Safely elevated above the floating bottom navigation dock (~80px)
                         child: Material(
                           color: Colors.transparent,
                           child: InkWell(
@@ -572,42 +572,100 @@ class _HomeScreenState extends State<HomeScreen> {
                   ],
                 ),
 
-                // Translucent Circular Notification Bell Button
-                InkWell(
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const NotificationsScreen()),
-                    );
-                  },
-                  borderRadius: BorderRadius.circular(20),
-                  child: Container(
-                    width: 36,
-                    height: 36,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.16),
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.28),
-                        width: 1.0,
+                // Header actions: Cart shortcut (if items exist) + Notification Bell Button
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Consumer<RestaurantProvider>(
+                      builder: (context, restProv, _) {
+                        if (restProv.totalCartCount == 0) return const SizedBox.shrink();
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 8.0),
+                          child: InkWell(
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const CreateDeliveryScreen(
+                                    initialCategory: DeliveryCategory.food,
+                                  ),
+                                ),
+                              );
+                            },
+                            borderRadius: BorderRadius.circular(20),
+                            child: Container(
+                              width: 36,
+                              height: 36,
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.22),
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: Colors.white.withValues(alpha: 0.35),
+                                  width: 1.0,
+                                ),
+                              ),
+                              child: Center(
+                                child: Badge(
+                                  label: Text(
+                                    '${restProv.totalCartCount}',
+                                    style: const TextStyle(
+                                      fontSize: 9,
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  backgroundColor: const Color(0xFF00C853),
+                                  child: const Icon(
+                                    Icons.shopping_bag_outlined,
+                                    color: Colors.white,
+                                    size: 18,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+
+                    // Translucent Circular Notification Bell Button
+                    InkWell(
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const NotificationsScreen()),
+                        );
+                      },
+                      borderRadius: BorderRadius.circular(20),
+                      child: Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.16),
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.28),
+                            width: 1.0,
+                          ),
+                        ),
+                        child: Center(
+                          child: Badge(
+                            isLabelVisible: unreadCount > 0,
+                            label: Text(
+                              '$unreadCount',
+                              style: const TextStyle(fontSize: 9, color: Colors.white, fontWeight: FontWeight.bold),
+                            ),
+                            backgroundColor: AppColors.error,
+                            child: const Icon(
+                              Icons.notifications_none_rounded,
+                              color: Colors.white,
+                              size: 19,
+                            ),
+                          ),
+                        ),
                       ),
                     ),
-                    child: Center(
-                      child: Badge(
-                        isLabelVisible: unreadCount > 0,
-                        label: Text(
-                          '$unreadCount',
-                          style: const TextStyle(fontSize: 9, color: Colors.white, fontWeight: FontWeight.bold),
-                        ),
-                        backgroundColor: AppColors.error,
-                        child: const Icon(
-                          Icons.notifications_none_rounded,
-                          color: Colors.white,
-                          size: 19,
-                        ),
-                      ),
-                    ),
-                  ),
+                  ],
                 ),
               ],
             ),
