@@ -85,20 +85,19 @@ class RestaurantProvider extends ChangeNotifier {
     return null;
   }
 
-  /// Calculates total delivery fee for food orders.
-  /// If multiple partner restaurants are selected in the cart, it sums each distinct
-  /// partner's delivery fee (fallback: 60 Birr per partner).
-  double get totalDeliveryFee {
-    if (_cart.isEmpty) {
-      return _selectedRestaurant?.deliveryFee ?? 60.0;
-    }
+  /// Standard delivery fee constant in Birr
+  static const double standardDeliveryFee = 100.0;
 
-    double fee = 0.0;
-    for (final partnerName in cartItemsByPartner.keys) {
-      final restaurant = findRestaurantByIdOrName(partnerName);
-      fee += restaurant?.deliveryFee ?? 60.0;
+  /// Calculates total delivery fee for food orders.
+  /// Fixed at 100 Birr per partner delivery dispatch (100 Birr base).
+  /// If multiple distinct partners are ordered from, each partner requires its own
+  /// dispatch (e.g. 1 partner = 100 Birr, 2 partners = 200 Birr, etc.).
+  double get totalDeliveryFee {
+    final partners = distinctPartnerCount;
+    if (partners <= 1) {
+      return standardDeliveryFee;
     }
-    return fee > 0 ? fee : 60.0;
+    return partners * standardDeliveryFee;
   }
 
   bool get isLoading => _isLoading;
