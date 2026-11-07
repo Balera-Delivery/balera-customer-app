@@ -501,7 +501,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
       child: Padding(
-        padding: EdgeInsets.fromLTRB(16.0, topPadding + 6.0, 16.0, 12.0),
+        padding: EdgeInsets.fromLTRB(16.0, topPadding + 2.0, 16.0, 10.0),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -514,16 +514,16 @@ class _HomeScreenState extends State<HomeScreen> {
                   children: [
                     // Circular Avatar with official Balera Logo
                     Container(
-                      width: 38,
-                      height: 38,
+                      width: 34,
+                      height: 34,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         color: Colors.white,
-                        border: Border.all(color: Colors.white, width: 2.0),
+                        border: Border.all(color: Colors.white, width: 1.5),
                         boxShadow: [
                           BoxShadow(
                             color: Colors.black.withValues(alpha: 0.15),
-                            blurRadius: 5,
+                            blurRadius: 4,
                             offset: const Offset(0, 2),
                           ),
                         ],
@@ -542,7 +542,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                   style: TextStyle(
                                     color: Colors.white,
                                     fontWeight: FontWeight.w900,
-                                    fontSize: 16,
+                                    fontSize: 14,
                                   ),
                                 ),
                               ),
@@ -551,14 +551,14 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ),
                     ),
-                    const SizedBox(width: 10),
+                    const SizedBox(width: 8),
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
                           _getGreeting(),
                           style: TextStyle(
-                            fontSize: 11,
+                            fontSize: 10.5,
                             fontWeight: FontWeight.w400,
                             color: Colors.white.withValues(alpha: 0.88),
                           ),
@@ -566,7 +566,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         Text(
                           userName.isNotEmpty ? userName : 'Faisa',
                           style: const TextStyle(
-                            fontSize: 15,
+                            fontSize: 14,
                             fontWeight: FontWeight.w900,
                             color: Colors.white,
                             letterSpacing: -0.2,
@@ -585,7 +585,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       builder: (context, restProv, _) {
                         if (restProv.totalCartCount == 0) return const SizedBox.shrink();
                         return Padding(
-                          padding: const EdgeInsets.only(right: 8.0),
+                          padding: const EdgeInsets.only(right: 6.0),
                           child: InkWell(
                             onTap: () {
                               Navigator.push(
@@ -599,8 +599,8 @@ class _HomeScreenState extends State<HomeScreen> {
                             },
                             borderRadius: BorderRadius.circular(20),
                             child: Container(
-                              width: 36,
-                              height: 36,
+                              width: 32,
+                              height: 32,
                               decoration: BoxDecoration(
                                 color: Colors.white.withValues(alpha: 0.22),
                                 shape: BoxShape.circle,
@@ -614,7 +614,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                   label: Text(
                                     '${restProv.totalCartCount}',
                                     style: const TextStyle(
-                                      fontSize: 9,
+                                      fontSize: 8.5,
                                       color: Colors.white,
                                       fontWeight: FontWeight.bold,
                                     ),
@@ -623,7 +623,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                   child: const Icon(
                                     Icons.shopping_bag_outlined,
                                     color: Colors.white,
-                                    size: 18,
+                                    size: 16,
                                   ),
                                 ),
                               ),
@@ -643,8 +643,8 @@ class _HomeScreenState extends State<HomeScreen> {
                       },
                       borderRadius: BorderRadius.circular(20),
                       child: Container(
-                        width: 36,
-                        height: 36,
+                        width: 32,
+                        height: 32,
                         decoration: BoxDecoration(
                           color: Colors.white.withValues(alpha: 0.16),
                           shape: BoxShape.circle,
@@ -658,13 +658,13 @@ class _HomeScreenState extends State<HomeScreen> {
                             isLabelVisible: unreadCount > 0,
                             label: Text(
                               '$unreadCount',
-                              style: const TextStyle(fontSize: 9, color: Colors.white, fontWeight: FontWeight.bold),
+                              style: const TextStyle(fontSize: 8.5, color: Colors.white, fontWeight: FontWeight.bold),
                             ),
                             backgroundColor: AppColors.error,
                             child: const Icon(
                               Icons.notifications_none_rounded,
                               color: Colors.white,
-                              size: 19,
+                              size: 17,
                             ),
                           ),
                         ),
@@ -675,12 +675,12 @@ class _HomeScreenState extends State<HomeScreen> {
               ],
             ),
 
-            const SizedBox(height: 10),
+            const SizedBox(height: 7),
 
             // Hero Card: Balera Delivery, 24/7 pill, compact stepper
             _buildBaleraDeliveryHeroCard(context, activeDelivery, hasActiveDelivery),
 
-            const SizedBox(height: 10),
+            const SizedBox(height: 7),
 
             // Search Bar matching screenshot
             _buildSearchBar(context),
@@ -709,10 +709,10 @@ class _HomeScreenState extends State<HomeScreen> {
         borderRadius: BorderRadius.circular(18),
         child: Container(
           width: double.infinity,
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+          padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 8.5),
           decoration: BoxDecoration(
             color: const Color(0xFF0038A8).withValues(alpha: 0.45),
-            borderRadius: BorderRadius.circular(18),
+            borderRadius: BorderRadius.circular(16),
             border: Border.all(
               color: hasActive
                   ? const Color(0xFF00E5FF).withValues(alpha: 0.45)
@@ -722,8 +722,8 @@ class _HomeScreenState extends State<HomeScreen> {
             boxShadow: [
               BoxShadow(
                 color: const Color(0xFF002B82).withValues(alpha: 0.20),
-                blurRadius: 12,
-                offset: const Offset(0, 4),
+                blurRadius: 10,
+                offset: const Offset(0, 3),
               ),
             ],
           ),
@@ -736,12 +736,12 @@ class _HomeScreenState extends State<HomeScreen> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3.5),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2.5),
                     decoration: BoxDecoration(
                       color: hasActive
                           ? const Color(0xFF00E5FF).withValues(alpha: 0.20)
                           : Colors.white.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius: BorderRadius.circular(14),
                       border: Border.all(
                         color: hasActive
                             ? const Color(0xFF00E5FF).withValues(alpha: 0.50)
@@ -757,15 +757,15 @@ class _HomeScreenState extends State<HomeScreen> {
                               ? 'Live Order ${delivery?.trackingCode != null ? "#${delivery!.trackingCode}" : "Active"}'
                               : 'Express Courier',
                           style: TextStyle(
-                            fontSize: 10.5,
+                            fontSize: 10,
                             fontWeight: FontWeight.w700,
                             color: hasActive ? const Color(0xFF00E5FF) : Colors.white,
                           ),
                         ),
-                        const SizedBox(width: 5),
+                        const SizedBox(width: 4),
                         Container(
-                          width: 5,
-                          height: 5,
+                          width: 4.5,
+                          height: 4.5,
                           decoration: BoxDecoration(
                             color: hasActive ? const Color(0xFF00E5FF) : const Color(0xFF00E5FF),
                             shape: BoxShape.circle,
@@ -777,7 +777,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               ? AppConstants.formatStatus(delivery?.status ?? 'ONGOING')
                               : 'Active 24/7',
                           style: const TextStyle(
-                            fontSize: 10.5,
+                            fontSize: 10,
                             fontWeight: FontWeight.w700,
                             color: Colors.white,
                           ),
@@ -788,11 +788,11 @@ class _HomeScreenState extends State<HomeScreen> {
 
                   // Arrow / Track Action Button ↗
                   Container(
-                    width: 28,
-                    height: 28,
+                    width: 25,
+                    height: 25,
                     decoration: BoxDecoration(
                       color: hasActive ? const Color(0xFF00E5FF) : const Color(0xFF0D5BFF),
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(7),
                       border: Border.all(
                         color: Colors.white.withValues(alpha: 0.25),
                         width: 1,
@@ -802,14 +802,14 @@ class _HomeScreenState extends State<HomeScreen> {
                       child: Icon(
                         Icons.north_east_rounded,
                         color: hasActive ? const Color(0xFF0A2668) : Colors.white,
-                        size: 16,
+                        size: 14,
                       ),
                     ),
                   ),
                 ],
               ),
 
-              const SizedBox(height: 7),
+              const SizedBox(height: 5),
 
               // Title "Balera Delivery" + Status subtitle
               Row(
@@ -818,7 +818,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   const Text(
                     'Balera Delivery',
                     style: TextStyle(
-                      fontSize: 19,
+                      fontSize: 17,
                       fontWeight: FontWeight.w900,
                       color: Colors.white,
                       letterSpacing: -0.3,
@@ -827,12 +827,12 @@ class _HomeScreenState extends State<HomeScreen> {
                   if (hasActive)
                     Row(
                       children: [
-                        const Icon(Icons.my_location_rounded, size: 12, color: Color(0xFF00E5FF)),
-                        const SizedBox(width: 4),
+                        const Icon(Icons.my_location_rounded, size: 11, color: Color(0xFF00E5FF)),
+                        const SizedBox(width: 3),
                         Text(
                           'Tap to track',
                           style: TextStyle(
-                            fontSize: 11,
+                            fontSize: 10.5,
                             fontWeight: FontWeight.w700,
                             color: const Color(0xFF00E5FF).withValues(alpha: 0.95),
                           ),
@@ -842,7 +842,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ],
               ),
 
-              const SizedBox(height: 7),
+              const SizedBox(height: 5),
 
               // Sub-row: "Instant Pickup" on left, "Doorstep Dropoff" on right
               Row(
@@ -1075,16 +1075,16 @@ class _HomeScreenState extends State<HomeScreen> {
   }
   Widget _buildSearchBar(BuildContext context) {
     return Container(
-      height: 44,
-      padding: const EdgeInsets.symmetric(horizontal: 14),
+      height: 38,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.08),
-            blurRadius: 8,
-            offset: const Offset(0, 3),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
           ),
         ],
       ),
@@ -1093,16 +1093,16 @@ class _HomeScreenState extends State<HomeScreen> {
           const Icon(
             Icons.search_rounded,
             color: Color(0xFF64748B),
-            size: 20,
+            size: 18,
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 7),
           Expanded(
             child: TextField(
               controller: _searchController,
               textInputAction: TextInputAction.search,
               style: const TextStyle(
                 color: Color(0xFF0F172A),
-                fontSize: 13,
+                fontSize: 12.5,
                 fontWeight: FontWeight.w600,
               ),
               decoration: InputDecoration(
