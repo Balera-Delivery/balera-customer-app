@@ -332,10 +332,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
                           // Popular Food Section (Dynamic from Partner Hotels / Admin Dashboard)
                           _buildPopularFoodSection(context),
-                          const SizedBox(height: 22),
-
-                          // Recent Deliveries History Preview
-                          _buildRecentDeliveriesSection(context, recentDeliveries),
                         ],
                       ),
                     ),
