@@ -1959,28 +1959,6 @@ class _HomeScreenState extends State<HomeScreen> {
                           onTap: () {
                             HapticFeedback.selectionClick();
                             restProv.addToCart(food);
-                            ScaffoldMessenger.of(context).hideCurrentSnackBar();
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('Added ${food.name} to order'),
-                                duration: const Duration(seconds: 1),
-                                behavior: SnackBarBehavior.floating,
-                                action: SnackBarAction(
-                                  label: 'View',
-                                  textColor: Colors.white,
-                                  onPressed: () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (_) => const CreateDeliveryScreen(
-                                          initialCategory: DeliveryCategory.food,
-                                        ),
-                                      ),
-                                    );
-                                  },
-                                ),
-                              ),
-                            );
                           },
                           borderRadius: BorderRadius.circular(14),
                           child: Container(
