@@ -256,13 +256,22 @@ class RestaurantProvider extends ChangeNotifier {
     _selectedFoodItem = foodItem;
     _selectedQuantity = _cart[foodItem.id]!.quantity;
 
-    // Auto set the restaurant if not set
-    if (_selectedRestaurant == null) {
-      final match = _restaurants.firstWhere(
-        (r) => r.id == foodItem.restaurantId || r.code == foodItem.restaurantId,
-        orElse: () => _restaurants.isNotEmpty ? _restaurants.first : FallbackHotelData.restaurants.first,
-      );
-      _selectedRestaurant = match;
+    // Automatically set the restaurant that owns this dish
+    final matchedRestaurant = _restaurants.cast<RestaurantModel?>().firstWhere(
+      (r) => r != null && (r.id == foodItem.restaurantId || r.code == foodItem.restaurantId),
+      orElse: () {
+        // Fallback search in fallback hotels
+        return FallbackHotelData.restaurants.cast<RestaurantModel?>().firstWhere(
+          (r) => r != null && (r.id == foodItem.restaurantId || r.code == foodItem.restaurantId || r.name == foodItem.restaurantName),
+          orElse: () => null,
+        );
+      },
+    );
+
+    if (matchedRestaurant != null) {
+      _selectedRestaurant = matchedRestaurant;
+    } else if (_selectedRestaurant == null && _restaurants.isNotEmpty) {
+      _selectedRestaurant = _restaurants.first;
     }
     notifyListeners();
   }

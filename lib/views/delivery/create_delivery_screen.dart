@@ -171,11 +171,15 @@ class _CreateDeliveryScreenState extends State<CreateDeliveryScreen> {
       restaurantProvider.fetchRestaurants().then((_) {
         if (mounted &&
             _selectedCategory == DeliveryCategory.food &&
-            restaurantProvider.selectedRestaurant == null &&
             restaurantProvider.restaurants.isNotEmpty) {
-          restaurantProvider.selectRestaurant(restaurantProvider.restaurants.first).then((_) {
-            if (mounted) _syncFromRestaurantProvider(restaurantProvider);
-          });
+          // If customer already selected a dish or has dishes in cart, DO NOT overwrite with Green Caffe!
+          if (restaurantProvider.selectedRestaurant == null) {
+            restaurantProvider.selectRestaurant(restaurantProvider.restaurants.first).then((_) {
+              if (mounted) _syncFromRestaurantProvider(restaurantProvider);
+            });
+          } else {
+            _syncFromRestaurantProvider(restaurantProvider);
+          }
         }
       });
     });
@@ -241,7 +245,13 @@ class _CreateDeliveryScreenState extends State<CreateDeliveryScreen> {
       _selectedCategory = category;
       if (category == DeliveryCategory.food) {
         final restaurantProvider = context.read<RestaurantProvider>();
-        if (restaurantProvider.restaurants.isEmpty) {
+        if (restaurantProvider.selectedRestaurant != null) {
+          _syncFromRestaurantProvider(restaurantProvider);
+        } else if (restaurantProvider.restaurants.isNotEmpty) {
+          restaurantProvider.selectRestaurant(restaurantProvider.restaurants.first).then((_) {
+            if (mounted) _syncFromRestaurantProvider(restaurantProvider);
+          });
+        } else {
           restaurantProvider.fetchRestaurants().then((_) {
             if (mounted && restaurantProvider.restaurants.isNotEmpty && restaurantProvider.selectedRestaurant == null) {
               restaurantProvider.selectRestaurant(restaurantProvider.restaurants.first).then((_) {
@@ -249,12 +259,6 @@ class _CreateDeliveryScreenState extends State<CreateDeliveryScreen> {
               });
             }
           });
-        } else if (restaurantProvider.selectedRestaurant == null && restaurantProvider.restaurants.isNotEmpty) {
-          restaurantProvider.selectRestaurant(restaurantProvider.restaurants.first).then((_) {
-            if (mounted) _syncFromRestaurantProvider(restaurantProvider);
-          });
-        } else if (restaurantProvider.selectedRestaurant != null) {
-          _syncFromRestaurantProvider(restaurantProvider);
         }
       } else {
         _itemDescriptionController.clear();
