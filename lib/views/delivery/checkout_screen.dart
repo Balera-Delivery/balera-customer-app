@@ -881,6 +881,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   @override
   Widget build(BuildContext context) {
     final deliveryProvider = context.watch<DeliveryProvider>();
+    final restaurantProvider = context.watch<RestaurantProvider>();
     final isFood = deliveryProvider.draftItemType == 'Food & Groceries' ||
         (deliveryProvider.draftItemDescription?.toLowerCase().contains('burger') ?? false) ||
         (deliveryProvider.draftItemDescription?.toLowerCase().contains('doro') ?? false) ||
@@ -888,7 +889,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         (deliveryProvider.draftItemDescription?.toLowerCase().contains('salad') ?? false);
 
     final double foodPrice = isFood ? (deliveryProvider.draftFoodPrice ?? 350.00) : 0.00;
-    final double deliveryFee = isFood ? 100.00 : 120.00;
+    final double deliveryFee = isFood ? restaurantProvider.totalDeliveryFee : 120.00;
     final double serviceFee = isFood ? 20.00 : 0.00;
     final double grossPrice = foodPrice + deliveryFee + serviceFee;
     final double totalPrice = (grossPrice - _appliedDiscount).clamp(0.0, double.infinity);

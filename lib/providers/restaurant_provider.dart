@@ -75,6 +75,32 @@ class RestaurantProvider extends ChangeNotifier {
   /// Number of distinct partners currently represented in the cart
   int get distinctPartnerCount => cartItemsByPartner.keys.length;
 
+  /// Find a restaurant by ID or name
+  RestaurantModel? findRestaurantByIdOrName(String identifier) {
+    for (final r in _restaurants) {
+      if (r.id == identifier || r.code == identifier || r.name.toLowerCase() == identifier.toLowerCase()) {
+        return r;
+      }
+    }
+    return null;
+  }
+
+  /// Calculates total delivery fee for food orders.
+  /// If multiple partner restaurants are selected in the cart, it sums each distinct
+  /// partner's delivery fee (fallback: 60 Birr per partner).
+  double get totalDeliveryFee {
+    if (_cart.isEmpty) {
+      return _selectedRestaurant?.deliveryFee ?? 60.0;
+    }
+
+    double fee = 0.0;
+    for (final partnerName in cartItemsByPartner.keys) {
+      final restaurant = findRestaurantByIdOrName(partnerName);
+      fee += restaurant?.deliveryFee ?? 60.0;
+    }
+    return fee > 0 ? fee : 60.0;
+  }
+
   bool get isLoading => _isLoading;
   bool get isLoadingMenu => _isLoadingMenu;
   bool get isLoadingFoods => _isLoadingFoods;

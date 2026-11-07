@@ -1561,10 +1561,10 @@ class _CreateDeliveryScreenState extends State<CreateDeliveryScreen> {
               ),
             ),
 
-            // Order Summary Metrics Card: [Total dishes | Selected partners | Food subtotal]
+            // Order Summary Metrics Card: [Total dishes | Selected partners | Delivery fee | Food subtotal]
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
               decoration: BoxDecoration(
                 color: const Color(0xFFEFF6FF),
                 borderRadius: BorderRadius.circular(18),
@@ -1578,46 +1578,63 @@ class _CreateDeliveryScreenState extends State<CreateDeliveryScreen> {
                       children: [
                         const Text(
                           'Total dishes',
-                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF64748B)),
+                          style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w600, color: Color(0xFF64748B)),
                         ),
                         const SizedBox(height: 3),
                         Text(
                           '${restaurantProvider.totalCartCount}',
-                          style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w900, color: Color(0xFF0F172A)),
+                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Color(0xFF0F172A)),
                         ),
                       ],
                     ),
                   ),
-                  Container(width: 1, height: 28, color: const Color(0xFFBFDBFE)),
+                  Container(width: 1, height: 26, color: const Color(0xFFBFDBFE)),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
                         const Text(
-                          'Selected partners',
-                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF64748B)),
+                          'Partners',
+                          style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w600, color: Color(0xFF64748B)),
                         ),
                         const SizedBox(height: 3),
                         Text(
                           '${restaurantProvider.distinctPartnerCount}',
-                          style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w900, color: Color(0xFF0F172A)),
+                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Color(0xFF0F172A)),
                         ),
                       ],
                     ),
                   ),
-                  Container(width: 1, height: 28, color: const Color(0xFFBFDBFE)),
+                  Container(width: 1, height: 26, color: const Color(0xFFBFDBFE)),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        const Text(
+                          'Delivery fee',
+                          style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w600, color: Color(0xFF64748B)),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          '${restaurantProvider.totalDeliveryFee.toStringAsFixed(0)} Birr',
+                          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: Color(0xFF0052EA)),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(width: 1, height: 26, color: const Color(0xFFBFDBFE)),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
                         const Text(
                           'Food subtotal',
-                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF64748B)),
+                          style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w600, color: Color(0xFF64748B)),
                         ),
                         const SizedBox(height: 3),
                         Text(
                           '${restaurantProvider.totalCartPrice.toStringAsFixed(0)} Birr',
-                          style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w900, color: Color(0xFF16A34A)),
+                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Color(0xFF16A34A)),
                         ),
                       ],
                     ),
@@ -2493,11 +2510,12 @@ class _CreateDeliveryScreenState extends State<CreateDeliveryScreen> {
   // ---------------------------------------------------------------------------
   Widget _buildStep3Checkout() {
     final deliveryProvider = context.watch<DeliveryProvider>();
+    final restaurantProvider = context.watch<RestaurantProvider>();
     final isFood = _selectedCategory == DeliveryCategory.food ||
         deliveryProvider.draftItemType == 'Food & Groceries';
 
     final double foodPrice = isFood ? (_selectedFoodPrice ?? deliveryProvider.draftFoodPrice ?? 0.00) : 0.00;
-    final double deliveryFee = isFood ? 100.00 : 120.00;
+    final double deliveryFee = isFood ? restaurantProvider.totalDeliveryFee : 120.00;
     final double serviceFee = isFood ? 20.00 : 0.00;
     final double totalPrice = foodPrice + deliveryFee + serviceFee;
     final currencyFormatter = NumberFormat("#,##0.00", "en_US");
@@ -2590,7 +2608,12 @@ class _CreateDeliveryScreenState extends State<CreateDeliveryScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text('Delivery Fee (Bale direct)', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                    Text(
+                      restaurantProvider.distinctPartnerCount > 1
+                          ? 'Delivery Fee (${restaurantProvider.distinctPartnerCount} partners)'
+                          : 'Delivery Fee (Bale direct)',
+                      style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                    ),
                     Text('${currencyFormatter.format(deliveryFee)} Birr', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
                   ],
                 ),
