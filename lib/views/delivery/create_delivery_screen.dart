@@ -1561,7 +1561,7 @@ class _CreateDeliveryScreenState extends State<CreateDeliveryScreen> {
               ),
             ),
 
-            // Order Summary Metrics Card: [Total dishes | Selected partners | Delivery fee | Food subtotal]
+            // Order Summary Metrics Card: [Total dishes | Selected partners | Delivery fee | Total subtotal]
             Container(
               width: double.infinity,
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
@@ -1628,12 +1628,12 @@ class _CreateDeliveryScreenState extends State<CreateDeliveryScreen> {
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
                         const Text(
-                          'Food subtotal',
+                          'Total subtotal',
                           style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w600, color: Color(0xFF64748B)),
                         ),
                         const SizedBox(height: 3),
                         Text(
-                          '${restaurantProvider.totalCartPrice.toStringAsFixed(0)} Birr',
+                          '${(restaurantProvider.totalCartPrice + restaurantProvider.totalDeliveryFee).toStringAsFixed(0)} Birr',
                           style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Color(0xFF16A34A)),
                         ),
                       ],
@@ -2608,12 +2608,7 @@ class _CreateDeliveryScreenState extends State<CreateDeliveryScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      restaurantProvider.distinctPartnerCount > 1
-                          ? 'Delivery Fee (${restaurantProvider.distinctPartnerCount} partners)'
-                          : 'Delivery Fee (Bale direct)',
-                      style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
-                    ),
+                    const Text('Delivery Fee (Bale direct)', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
                     Text('${currencyFormatter.format(deliveryFee)} Birr', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
                   ],
                 ),

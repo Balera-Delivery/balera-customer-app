@@ -423,7 +423,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                           overflow: TextOverflow.ellipsis,
                                         ),
                                         Text(
-                                          '${totalPrice.toStringAsFixed(0)} Birr total',
+                                          '${(totalPrice + 100.0).toStringAsFixed(0)} Birr total (incl. delivery)',
                                           style: TextStyle(
                                             fontSize: 11.5,
                                             fontWeight: FontWeight.w600,

@@ -89,16 +89,8 @@ class RestaurantProvider extends ChangeNotifier {
   static const double standardDeliveryFee = 100.0;
 
   /// Calculates total delivery fee for food orders.
-  /// Fixed at 100 Birr per partner delivery dispatch (100 Birr base).
-  /// If multiple distinct partners are ordered from, each partner requires its own
-  /// dispatch (e.g. 1 partner = 100 Birr, 2 partners = 200 Birr, etc.).
-  double get totalDeliveryFee {
-    final partners = distinctPartnerCount;
-    if (partners <= 1) {
-      return standardDeliveryFee;
-    }
-    return partners * standardDeliveryFee;
-  }
+  /// Fixed at flat 100 Birr.
+  double get totalDeliveryFee => standardDeliveryFee;
 
   bool get isLoading => _isLoading;
   bool get isLoadingMenu => _isLoadingMenu;
