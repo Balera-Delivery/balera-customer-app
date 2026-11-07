@@ -203,6 +203,7 @@ class _CreateDeliveryScreenState extends State<CreateDeliveryScreen> {
     final restaurant = provider.selectedRestaurant;
     final food = provider.selectedFoodItem;
     final qty = provider.selectedQuantity;
+    final cart = provider.cart;
 
     if (restaurant != null) {
       _selectedRestaurantName = restaurant.name;
@@ -211,7 +212,10 @@ class _CreateDeliveryScreenState extends State<CreateDeliveryScreen> {
       _selectedPickupLng = restaurant.longitude ?? 39.9833;
       _pickupController.text = restaurant.address;
 
-      if (food != null) {
+      if (cart.isNotEmpty) {
+        _selectedFoodPrice = provider.totalCartPrice;
+        _itemDescriptionController.text = provider.formattedDeliveryDescription;
+      } else if (food != null) {
         _selectedFoodPrice = food.price * qty;
         final qtyPrefix = qty > 1 ? '${qty}x ' : '';
         _itemDescriptionController.text =
@@ -1443,11 +1447,12 @@ class _CreateDeliveryScreenState extends State<CreateDeliveryScreen> {
                     separatorBuilder: (_, __) => const SizedBox(width: 12),
                     itemBuilder: (context, idx) {
                       final food = filteredFoods[idx];
-                      final isSelected = selectedFood?.id == food.id;
+                      final isSelected = restaurantProvider.isFoodInCart(food.id) || selectedFood?.id == food.id;
 
                       return _buildDishItemCard(
                         food: food,
                         isSelected: isSelected,
+                        quantityInCart: restaurantProvider.getFoodQuantityInCart(food.id),
                         onTap: () => _onFoodItemSelected(food),
                       );
                     },
@@ -1456,7 +1461,152 @@ class _CreateDeliveryScreenState extends State<CreateDeliveryScreen> {
               },
             ),
 
-            if (selectedFood != null) ...[
+            if (restaurantProvider.cart.isNotEmpty) ...[
+              const SizedBox(height: 14),
+              // Multi-Item Cart Summary Box
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(color: const Color(0xFF0052EA).withValues(alpha: 0.3), width: 1.2),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF0052EA).withValues(alpha: 0.05),
+                      blurRadius: 10,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFEFF6FF),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                '${restaurantProvider.totalCartCount} items',
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w800,
+                                  color: Color(0xFF0052EA),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            const Text(
+                              'Selected Dishes:',
+                              style: TextStyle(
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.w800,
+                                color: Color(0xFF0F172A),
+                              ),
+                            ),
+                          ],
+                        ),
+                        Text(
+                          '${restaurantProvider.totalCartPrice.toStringAsFixed(0)} Birr',
+                          style: const TextStyle(
+                            fontSize: 14.5,
+                            fontWeight: FontWeight.w900,
+                            color: Color(0xFF0052EA),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    ...restaurantProvider.cartItems.map((cartItem) {
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 4.0),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                cartItem.food.name,
+                                style: const TextStyle(
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF334155),
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            Text(
+                              '${cartItem.totalPrice.toStringAsFixed(0)} Birr',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF64748B),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Row(
+                              children: [
+                                InkWell(
+                                  onTap: () {
+                                    HapticFeedback.lightImpact();
+                                    restaurantProvider.removeFromCart(cartItem.food.id);
+                                    _syncFromRestaurantProvider(restaurantProvider);
+                                  },
+                                  borderRadius: BorderRadius.circular(10),
+                                  child: Container(
+                                    width: 24,
+                                    height: 24,
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFF1F5F9),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: const Center(
+                                      child: Icon(Icons.remove, size: 14, color: Color(0xFF0052EA)),
+                                    ),
+                                  ),
+                                ),
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                                  child: Text(
+                                    '${cartItem.quantity}',
+                                    style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800),
+                                  ),
+                                ),
+                                InkWell(
+                                  onTap: () {
+                                    HapticFeedback.lightImpact();
+                                    restaurantProvider.addToCart(cartItem.food);
+                                    _syncFromRestaurantProvider(restaurantProvider);
+                                  },
+                                  borderRadius: BorderRadius.circular(10),
+                                  child: Container(
+                                    width: 24,
+                                    height: 24,
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFEFF6FF),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: const Center(
+                                      child: Icon(Icons.add, size: 14, color: Color(0xFF0052EA)),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      );
+                    }),
+                  ],
+                ),
+              ),
+            ] else if (selectedFood != null) ...[
               const SizedBox(height: 12),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -1723,6 +1873,7 @@ class _CreateDeliveryScreenState extends State<CreateDeliveryScreen> {
   Widget _buildDishItemCard({
     required dynamic food,
     required bool isSelected,
+    int quantityInCart = 0,
     required VoidCallback onTap,
   }) {
     return InkWell(
@@ -1811,14 +1962,14 @@ class _CreateDeliveryScreenState extends State<CreateDeliveryScreen> {
               ),
               child: Center(
                 child: isSelected
-                    ? const Row(
+                    ? Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.check, size: 14, color: Colors.white),
-                          SizedBox(width: 4),
+                          const Icon(Icons.check, size: 14, color: Colors.white),
+                          const SizedBox(width: 4),
                           Text(
-                            'Selected',
-                            style: TextStyle(
+                            quantityInCart > 1 ? '${quantityInCart}x Added' : 'Selected',
+                            style: const TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w700,
                               color: Colors.white,

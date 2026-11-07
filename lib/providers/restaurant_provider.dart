@@ -4,6 +4,18 @@ import '../models/food_item_model.dart';
 import '../models/restaurant_model.dart';
 import '../services/restaurant_service.dart';
 
+class CartItem {
+  final FoodItemModel food;
+  int quantity;
+
+  CartItem({
+    required this.food,
+    this.quantity = 1,
+  });
+
+  double get totalPrice => food.price * quantity;
+}
+
 class RestaurantProvider extends ChangeNotifier {
   final RestaurantService _restaurantService = RestaurantService();
 
@@ -12,6 +24,9 @@ class RestaurantProvider extends ChangeNotifier {
   RestaurantModel? _selectedRestaurant;
   FoodItemModel? _selectedFoodItem;
   int _selectedQuantity = 1;
+
+  // Cart for multiple food/product items
+  final Map<String, CartItem> _cart = {};
 
   bool _isLoading = false;
   bool _isLoadingMenu = false;
@@ -24,6 +39,15 @@ class RestaurantProvider extends ChangeNotifier {
   RestaurantModel? get selectedRestaurant => _selectedRestaurant;
   FoodItemModel? get selectedFoodItem => _selectedFoodItem;
   int get selectedQuantity => _selectedQuantity;
+
+  // Multi-item cart getters
+  Map<String, CartItem> get cart => _cart;
+  List<CartItem> get cartItems => _cart.values.toList();
+  int get totalCartCount => _cart.values.fold(0, (sum, item) => sum + item.quantity);
+  double get totalCartPrice => _cart.values.fold(0.0, (sum, item) => sum + item.totalPrice);
+  bool isFoodInCart(String foodId) => _cart.containsKey(foodId);
+  int getFoodQuantityInCart(String foodId) => _cart[foodId]?.quantity ?? 0;
+
   bool get isLoading => _isLoading;
   bool get isLoadingMenu => _isLoadingMenu;
   bool get isLoadingFoods => _isLoadingFoods;
@@ -31,6 +55,9 @@ class RestaurantProvider extends ChangeNotifier {
   String get searchQuery => _searchQuery;
 
   double get currentFoodPrice {
+    if (_cart.isNotEmpty) {
+      return totalCartPrice;
+    }
     if (_selectedFoodItem == null) return 0.0;
     return _selectedFoodItem!.price * _selectedQuantity;
   }
@@ -214,6 +241,72 @@ class RestaurantProvider extends ChangeNotifier {
   // Select a specific dish / food item
   void selectFoodItem(FoodItemModel foodItem) {
     _selectedFoodItem = foodItem;
+    // Also add to cart for multi-product selection
+    addToCart(foodItem);
+    notifyListeners();
+  }
+
+  // Multi-item cart operations
+  void addToCart(FoodItemModel foodItem) {
+    if (_cart.containsKey(foodItem.id)) {
+      _cart[foodItem.id]!.quantity += 1;
+    } else {
+      _cart[foodItem.id] = CartItem(food: foodItem, quantity: 1);
+    }
+    _selectedFoodItem = foodItem;
+    _selectedQuantity = _cart[foodItem.id]!.quantity;
+
+    // Auto set the restaurant if not set
+    if (_selectedRestaurant == null) {
+      final match = _restaurants.firstWhere(
+        (r) => r.id == foodItem.restaurantId || r.code == foodItem.restaurantId,
+        orElse: () => _restaurants.isNotEmpty ? _restaurants.first : FallbackHotelData.restaurants.first,
+      );
+      _selectedRestaurant = match;
+    }
+    notifyListeners();
+  }
+
+  void removeFromCart(String foodId) {
+    if (_cart.containsKey(foodId)) {
+      if (_cart[foodId]!.quantity > 1) {
+        _cart[foodId]!.quantity -= 1;
+      } else {
+        _cart.remove(foodId);
+      }
+      if (_selectedFoodItem?.id == foodId) {
+        if (_cart.isNotEmpty) {
+          _selectedFoodItem = _cart.values.last.food;
+          _selectedQuantity = _cart.values.last.quantity;
+        } else {
+          _selectedFoodItem = null;
+          _selectedQuantity = 1;
+        }
+      }
+      notifyListeners();
+    }
+  }
+
+  void deleteFromCart(String foodId) {
+    if (_cart.containsKey(foodId)) {
+      _cart.remove(foodId);
+      if (_selectedFoodItem?.id == foodId) {
+        if (_cart.isNotEmpty) {
+          _selectedFoodItem = _cart.values.last.food;
+          _selectedQuantity = _cart.values.last.quantity;
+        } else {
+          _selectedFoodItem = null;
+          _selectedQuantity = 1;
+        }
+      }
+      notifyListeners();
+    }
+  }
+
+  void clearCart() {
+    _cart.clear();
+    _selectedFoodItem = null;
+    _selectedQuantity = 1;
     notifyListeners();
   }
 
@@ -222,6 +315,7 @@ class RestaurantProvider extends ChangeNotifier {
     _selectedRestaurant = null;
     _selectedFoodItem = null;
     _selectedQuantity = 1;
+    _cart.clear();
     notifyListeners();
   }
 
@@ -229,33 +323,59 @@ class RestaurantProvider extends ChangeNotifier {
   void setQuantity(int qty) {
     if (qty > 0) {
       _selectedQuantity = qty;
+      if (_selectedFoodItem != null && _cart.containsKey(_selectedFoodItem!.id)) {
+        _cart[_selectedFoodItem!.id]!.quantity = qty;
+      }
       notifyListeners();
     }
   }
 
   void incrementQuantity() {
     _selectedQuantity++;
+    if (_selectedFoodItem != null) {
+      if (_cart.containsKey(_selectedFoodItem!.id)) {
+        _cart[_selectedFoodItem!.id]!.quantity = _selectedQuantity;
+      } else {
+        _cart[_selectedFoodItem!.id] = CartItem(food: _selectedFoodItem!, quantity: _selectedQuantity);
+      }
+    }
     notifyListeners();
   }
 
   void decrementQuantity() {
     if (_selectedQuantity > 1) {
       _selectedQuantity--;
+      if (_selectedFoodItem != null && _cart.containsKey(_selectedFoodItem!.id)) {
+        _cart[_selectedFoodItem!.id]!.quantity = _selectedQuantity;
+      }
       notifyListeners();
     }
   }
 
-  // Formatted summary of selected order for the delivery description
+  // Formatted summary of selected order for the delivery description (single or multi-item)
   String get formattedDeliveryDescription {
-    if (_selectedRestaurant == null) {
+    if (_selectedRestaurant == null && _cart.isEmpty) {
       return '';
     }
+
+    if (_cart.isNotEmpty) {
+      final itemsSummary = _cart.values.map((item) {
+        final q = item.quantity > 1 ? '${item.quantity}x ' : '';
+        return '$q${item.food.name}';
+      }).join(', ');
+
+      final restaurantName = _selectedRestaurant?.name ??
+          (_cart.values.first.food.restaurantName ?? 'Partner Restaurant');
+      final totalPriceStr = '${totalCartPrice.toStringAsFixed(0)} Birr';
+      return '$itemsSummary (Total: $totalPriceStr) - $restaurantName';
+    }
+
     if (_selectedFoodItem == null) {
-      return 'Food Delivery from ${_selectedRestaurant!.name}';
+      return 'Food Delivery from ${_selectedRestaurant?.name ?? "Partner"}';
     }
     final dish = _selectedFoodItem!.name;
     final qty = _selectedQuantity > 1 ? '${_selectedQuantity}x ' : '';
     final price = '${(_selectedFoodItem!.price * _selectedQuantity).toStringAsFixed(0)} Birr';
-    return '$qty$dish ($price) - ${_selectedRestaurant!.name}';
+    return '$qty$dish ($price) - ${_selectedRestaurant?.name ?? "Partner"}';
   }
 }

@@ -292,50 +292,169 @@ class _HomeScreenState extends State<HomeScreen> {
             // 2. SCROLLABLE BODY CONTENT
             // ========================================================
             Expanded(
-              child: RefreshIndicator(
-                color: AppColors.primary,
-                onRefresh: () async {
-                  await Future.wait([
-                    deliveryProvider.fetchDeliveries(),
-                    notificationProvider.fetchNotifications(),
-                    context.read<RestaurantProvider>().fetchRestaurants(),
-                    context.read<RestaurantProvider>().fetchFoods(),
-                  ]);
-                },
-                child: SingleChildScrollView(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  padding: const EdgeInsets.fromLTRB(18.0, 14.0, 18.0, 110.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Retained Special Promotional Voucher Banner
-                      _buildPromoBannerCard(context),
+              child: Stack(
+                children: [
+                  RefreshIndicator(
+                    color: AppColors.primary,
+                    onRefresh: () async {
+                      await Future.wait([
+                        deliveryProvider.fetchDeliveries(),
+                        notificationProvider.fetchNotifications(),
+                        context.read<RestaurantProvider>().fetchRestaurants(),
+                        context.read<RestaurantProvider>().fetchFoods(),
+                      ]);
+                    },
+                    child: SingleChildScrollView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: const EdgeInsets.fromLTRB(18.0, 14.0, 18.0, 110.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Retained Special Promotional Voucher Banner
+                          _buildPromoBannerCard(context),
 
-                      // Active Ongoing Order Tracker Card (if active order exists)
-                      if (hasActiveDelivery) ...[
-                        _buildActiveOngoingTrackerCard(context, activeDelivery),
-                        const SizedBox(height: 18),
-                      ],
+                          // Active Ongoing Order Tracker Card (if active order exists)
+                          if (hasActiveDelivery) ...[
+                            _buildActiveOngoingTrackerCard(context, activeDelivery),
+                            const SizedBox(height: 18),
+                          ],
 
-                      // OTP Verification Box if Rider has Arrived
-                      if (isArrived) ...[
-                        _buildRiderArrivedOtpBox(context, activeDelivery),
-                        const SizedBox(height: 18),
-                      ],
+                          // OTP Verification Box if Rider has Arrived
+                          if (isArrived) ...[
+                            _buildRiderArrivedOtpBox(context, activeDelivery),
+                            const SizedBox(height: 18),
+                          ],
 
-                      // Services Section (6 colorful rounded cards matching screenshot)
-                      _buildServicesSection(context),
-                      const SizedBox(height: 22),
+                          // Services Section (6 colorful rounded cards matching screenshot)
+                          _buildServicesSection(context),
+                          const SizedBox(height: 22),
 
-                      // Popular Food Section (Dynamic from Partner Hotels / Admin Dashboard)
-                      _buildPopularFoodSection(context),
-                      const SizedBox(height: 22),
+                          // Popular Food Section (Dynamic from Partner Hotels / Admin Dashboard)
+                          _buildPopularFoodSection(context),
+                          const SizedBox(height: 22),
 
-                      // Recent Deliveries History Preview
-                      _buildRecentDeliveriesSection(context, recentDeliveries),
-                    ],
+                          // Recent Deliveries History Preview
+                          _buildRecentDeliveriesSection(context, recentDeliveries),
+                        ],
+                      ),
+                    ),
                   ),
-                ),
+
+                  // Floating Multi-Order Cart Bar (appears when 1 or more items are selected)
+                  Consumer<RestaurantProvider>(
+                    builder: (context, restProv, _) {
+                      if (restProv.totalCartCount == 0) return const SizedBox.shrink();
+
+                      final count = restProv.totalCartCount;
+                      final totalPrice = restProv.totalCartPrice;
+
+                      return Positioned(
+                        left: 16,
+                        right: 16,
+                        bottom: 14,
+                        child: Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const CreateDeliveryScreen(
+                                    initialCategory: DeliveryCategory.food,
+                                  ),
+                                ),
+                              );
+                            },
+                            borderRadius: BorderRadius.circular(18),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 13),
+                              decoration: BoxDecoration(
+                                gradient: const LinearGradient(
+                                  colors: [Color(0xFF004BE4), Color(0xFF005BF6), Color(0xFF1E67FF)],
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                ),
+                                borderRadius: BorderRadius.circular(18),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: const Color(0xFF0052EA).withValues(alpha: 0.35),
+                                    blurRadius: 16,
+                                    offset: const Offset(0, 6),
+                                  ),
+                                ],
+                              ),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withValues(alpha: 0.22),
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        const Icon(Icons.shopping_bag_outlined, color: Colors.white, size: 17),
+                                        const SizedBox(width: 5),
+                                        Text(
+                                          '$count',
+                                          style: const TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w900,
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(width: 14),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Text(
+                                          '$count ${count == 1 ? "dish" : "dishes"} selected',
+                                          style: const TextStyle(
+                                            fontSize: 13.5,
+                                            fontWeight: FontWeight.w800,
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                                        Text(
+                                          '${totalPrice.toStringAsFixed(0)} Birr total',
+                                          style: TextStyle(
+                                            fontSize: 11.5,
+                                            fontWeight: FontWeight.w600,
+                                            color: Colors.white.withValues(alpha: 0.85),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  Row(
+                                    children: const [
+                                      Text(
+                                        'Checkout',
+                                        style: TextStyle(
+                                          fontSize: 13.5,
+                                          fontWeight: FontWeight.w800,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                      SizedBox(width: 4),
+                                      Icon(Icons.arrow_forward_rounded, color: Colors.white, size: 16),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ],
               ),
             ),
           ],
@@ -1713,34 +1832,118 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ],
                     ),
-                    InkWell(
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => CreateDeliveryScreen(
-                              initialCategory: DeliveryCategory.food,
-                              initialItemType: '$title from $restaurant',
-                            ),
-                          ),
-                        );
-                      },
-                      borderRadius: BorderRadius.circular(15),
-                      child: Container(
-                        width: 30,
-                        height: 30,
-                        decoration: const BoxDecoration(
-                          color: Color(0xFF0D5BFF),
-                          shape: BoxShape.circle,
+                    Row(
+                      children: [
+                        Consumer<RestaurantProvider>(
+                          builder: (context, restProv, _) {
+                            final inCart = restProv.isFoodInCart(food.id);
+                            final qty = restProv.getFoodQuantityInCart(food.id);
+
+                            if (inCart && qty > 0) {
+                              return Container(
+                                height: 32,
+                                padding: const EdgeInsets.symmetric(horizontal: 4),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFEFF6FF),
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(color: const Color(0xFF0D5BFF), width: 1.2),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    InkWell(
+                                      onTap: () {
+                                        HapticFeedback.lightImpact();
+                                        restProv.removeFromCart(food.id);
+                                      },
+                                      borderRadius: BorderRadius.circular(12),
+                                      child: const Padding(
+                                        padding: EdgeInsets.all(2.0),
+                                        child: Icon(
+                                          Icons.remove_rounded,
+                                          size: 16,
+                                          color: Color(0xFF0D5BFF),
+                                        ),
+                                      ),
+                                    ),
+                                    Padding(
+                                      padding: const EdgeInsets.symmetric(horizontal: 5),
+                                      child: Text(
+                                        '$qty',
+                                        style: const TextStyle(
+                                          fontSize: 12.5,
+                                          fontWeight: FontWeight.w800,
+                                          color: Color(0xFF0D5BFF),
+                                        ),
+                                      ),
+                                    ),
+                                    InkWell(
+                                      onTap: () {
+                                        HapticFeedback.lightImpact();
+                                        restProv.addToCart(food);
+                                      },
+                                      borderRadius: BorderRadius.circular(12),
+                                      child: const Padding(
+                                        padding: EdgeInsets.all(2.0),
+                                        child: Icon(
+                                          Icons.add_rounded,
+                                          size: 16,
+                                          color: Color(0xFF0D5BFF),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            }
+
+                            return InkWell(
+                              onTap: () {
+                                HapticFeedback.selectionClick();
+                                restProv.addToCart(food);
+                                ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('Added ${food.name} to order'),
+                                    duration: const Duration(seconds: 1),
+                                    behavior: SnackBarBehavior.floating,
+                                    action: SnackBarAction(
+                                      label: 'View',
+                                      textColor: Colors.white,
+                                      onPressed: () {
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (_) => const CreateDeliveryScreen(
+                                              initialCategory: DeliveryCategory.food,
+                                            ),
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  ),
+                                );
+                              },
+                              borderRadius: BorderRadius.circular(16),
+                              child: Container(
+                                width: 32,
+                                height: 32,
+                                decoration: const BoxDecoration(
+                                  color: Color(0xFF0D5BFF),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Center(
+                                  child: Icon(
+                                    Icons.add_rounded,
+                                    color: Colors.white,
+                                    size: 20,
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
                         ),
-                        child: const Center(
-                          child: Icon(
-                            Icons.add_rounded,
-                            color: Colors.white,
-                            size: 19,
-                          ),
-                        ),
-                      ),
+                      ],
                     ),
                   ],
                 ),
