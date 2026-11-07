@@ -239,7 +239,6 @@ class _DeliveryHistoryScreenState extends State<DeliveryHistoryScreen> {
       ),
     );
   }
-  }
 
   // ---------------------------------------------------------------------------
   // Delivery Card (Screen 17 redesign matching the screenshot)
