@@ -20,6 +20,7 @@ import '../delivery/delivery_otp_screen.dart';
 import '../delivery/delivery_tracking_screen.dart';
 import '../history/delivery_history_screen.dart';
 import '../notifications/notifications_screen.dart';
+import '../../services/promotion_service.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -33,6 +34,17 @@ class _HomeScreenState extends State<HomeScreen> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
   String _selectedCategoryFilter = 'All';
+  final PromotionService _promotionService = PromotionService();
+  PromotionModel? _activePromotion;
+
+  Future<void> _fetchActivePromotion() async {
+    final promos = await _promotionService.getActivePromotions();
+    if (mounted) {
+      setState(() {
+        _activePromotion = promos.isNotEmpty ? promos.first : null;
+      });
+    }
+  }
 
   @override
   void initState() {
@@ -50,6 +62,7 @@ class _HomeScreenState extends State<HomeScreen> {
       context.read<NotificationProvider>().fetchNotifications();
       context.read<RestaurantProvider>().fetchRestaurants();
       context.read<RestaurantProvider>().fetchFoods();
+      _fetchActivePromotion();
     });
     _refreshTimer = Timer.periodic(const Duration(seconds: 8), (_) {
       if (mounted) {
@@ -128,6 +141,17 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildPromoBannerCard(BuildContext context) {
+    if (_activePromotion == null) {
+      return const SizedBox.shrink();
+    }
+
+    final promo = _activePromotion!;
+    final discountLabel = promo.promotionType == 'FREE_DELIVERY'
+        ? 'FREE DELIVERY'
+        : promo.discountType == 'PERCENTAGE'
+            ? '${promo.discountValue.toStringAsFixed(0)}% OFF'
+            : '${promo.discountValue.toStringAsFixed(0)} BIRR OFF';
+
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.only(bottom: 20),
@@ -183,9 +207,9 @@ class _HomeScreenState extends State<HomeScreen> {
                               color: Colors.white.withValues(alpha: 0.25),
                               borderRadius: BorderRadius.circular(6),
                             ),
-                            child: const Text(
-                              'SPECIAL PROMO',
-                              style: TextStyle(
+                            child: Text(
+                              promo.code.isNotEmpty ? promo.code : 'SPECIAL PROMO',
+                              style: const TextStyle(
                                 fontSize: 9.5,
                                 fontWeight: FontWeight.w800,
                                 color: Colors.white,
@@ -195,20 +219,24 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                           const SizedBox(width: 6),
                           Text(
-                            'Save on Orders',
-                            style: TextStyle(fontSize: 11, color: Colors.white.withValues(alpha: 0.9), fontWeight: FontWeight.w600),
+                            discountLabel,
+                            style: TextStyle(fontSize: 11, color: Colors.white.withValues(alpha: 0.9), fontWeight: FontWeight.w700),
                           ),
                         ],
                       ),
                       const SizedBox(height: 4),
-                      const Text(
-                        'Apply promo codes at checkout for instant discounts & free delivery!',
-                        style: TextStyle(
+                      Text(
+                        promo.description.isNotEmpty
+                            ? promo.description
+                            : (promo.title.isNotEmpty ? promo.title : 'Apply promo code at checkout for special discount!'),
+                        style: const TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w700,
                           color: Colors.white,
                           height: 1.25,
                         ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ],
                   ),
@@ -303,6 +331,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         notificationProvider.fetchNotifications(),
                         context.read<RestaurantProvider>().fetchRestaurants(),
                         context.read<RestaurantProvider>().fetchFoods(),
+                        _fetchActivePromotion(),
                       ]);
                     },
                     child: SingleChildScrollView(
