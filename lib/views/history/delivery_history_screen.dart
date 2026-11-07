@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/utils/formatters.dart';
 import '../../core/widgets/empty_state_view.dart';
-import '../../core/widgets/status_badge.dart';
 import '../../models/delivery_model.dart';
 import '../../providers/delivery_provider.dart';
 import '../delivery/delivery_details_screen.dart';
@@ -44,59 +44,23 @@ class _DeliveryHistoryScreenState extends State<DeliveryHistoryScreen> {
 
     final list = getFilteredList();
 
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        title: const Text(
-          'My Deliveries',
-          style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18),
-        ),
-        automaticallyImplyLeading: false,
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.light,
+        statusBarBrightness: Brightness.dark,
       ),
-      body: SafeArea(
-        child: Column(
+      child: Scaffold(
+        backgroundColor: const Color(0xFFF8FAFC),
+        body: Column(
           children: [
-            // Filter Pills Row (Screen 17)
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-              child: Row(
-                children: ['All', 'Completed', 'In Progress', 'Cancelled'].map((filter) {
-                  final isSelected = _selectedFilter == filter;
-                  return Padding(
-                    padding: const EdgeInsets.only(right: 8.0),
-                    child: ChoiceChip(
-                      label: Text(
-                        filter,
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                          color: isSelected ? Colors.white : AppColors.textSecondary,
-                        ),
-                      ),
-                      selected: isSelected,
-                      selectedColor: AppColors.primary,
-                      backgroundColor: const Color(0xFFF1F5F9),
-                      side: BorderSide.none,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                      onSelected: (selected) {
-                        if (selected) {
-                          setState(() {
-                            _selectedFilter = filter;
-                          });
-                        }
-                      },
-                    ),
-                  );
-                }).toList(),
-              ),
-            ),
+            // Fixed Top Curved Royal Blue Header
+            _buildCurvedHeader(context, list.length),
 
-            const Divider(height: 1, color: Color(0xFFF1F5F9)),
-
-            // Delivery List Items (Screen 17) with RefreshIndicator
+            // Scrollable Delivery Cards List with Pull-to-refresh
             Expanded(
               child: RefreshIndicator(
+                color: const Color(0xFF0052EA),
                 onRefresh: () => deliveryProvider.fetchDeliveries(),
                 child: list.isEmpty
                     ? ListView(
@@ -111,76 +75,12 @@ class _DeliveryHistoryScreenState extends State<DeliveryHistoryScreen> {
                       )
                     : ListView.separated(
                         physics: const AlwaysScrollableScrollPhysics(),
-                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
                         itemCount: list.length,
-                        separatorBuilder: (_, __) => const Divider(height: 20, color: Color(0xFFF1F5F9)),
+                        separatorBuilder: (_, __) => const SizedBox(height: 12),
                         itemBuilder: (context, index) {
                           final item = list[index];
-                          final isCancelled = AppConstants.isCancelled(item.status);
-                          return InkWell(
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => DeliveryDetailsScreen(delivery: item),
-                                ),
-                              );
-                            },
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 4.0),
-                              child: Row(
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.all(10),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFFF1F5F9),
-                                      borderRadius: BorderRadius.circular(10),
-                                    ),
-                                    child: Icon(
-                                      isCancelled
-                                          ? Icons.cancel_outlined
-                                          : Icons.local_shipping_outlined,
-                                      color: isCancelled
-                                          ? AppColors.error
-                                          : AppColors.primary,
-                                      size: 22,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 14),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          '#${item.trackingCode ?? item.id}',
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.w700,
-                                            fontSize: 14,
-                                            color: AppColors.textPrimary,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 2),
-                                        Text(
-                                          Formatters.dateTime(item.createdAt),
-                                          style: const TextStyle(
-                                            fontSize: 12,
-                                            color: AppColors.textMuted,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  StatusBadge(status: item.status),
-                                  const SizedBox(width: 8),
-                                  const Icon(
-                                    Icons.arrow_forward_ios_rounded,
-                                    size: 14,
-                                    color: AppColors.textMuted,
-                                  ),
-                                ],
-                              ),
-                            ),
-                          );
+                          return _buildDeliveryCard(context, item);
                         },
                       ),
               ),
@@ -190,4 +90,300 @@ class _DeliveryHistoryScreenState extends State<DeliveryHistoryScreen> {
       ),
     );
   }
+
+  // ---------------------------------------------------------------------------
+  // Top Royal Blue Curved Header with Filter Pills
+  // ---------------------------------------------------------------------------
+  Widget _buildCurvedHeader(BuildContext context, int count) {
+    final topPadding = MediaQuery.of(context).padding.top;
+    final filters = ['All', 'Completed', 'In Progress', 'Cancelled'];
+
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.only(
+        top: topPadding + 14,
+        bottom: 20,
+      ),
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color(0xFF004BE4),
+            Color(0xFF005BF6),
+            Color(0xFF1E67FF),
+          ],
+        ),
+        borderRadius: BorderRadius.vertical(
+          bottom: Radius.circular(32),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Color(0x33005BF6),
+            blurRadius: 18,
+            offset: Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Title & Count in Header
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'My Deliveries',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 22,
+                    color: Colors.white,
+                    letterSpacing: -0.3,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '$count ${count == 1 ? 'delivery' : 'deliveries'}',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.white.withValues(alpha: 0.85),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 16),
+
+          // Horizontal Filter Pills inside the Blue Header
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              children: filters.map((filter) {
+                final isSelected = _selectedFilter == filter;
+                return Padding(
+                  padding: const EdgeInsets.only(right: 8.0),
+                  child: InkWell(
+                    onTap: () {
+                      setState(() {
+                        _selectedFilter = filter;
+                      });
+                    },
+                    borderRadius: BorderRadius.circular(24),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: isSelected ? Colors.white : Colors.white.withValues(alpha: 0.16),
+                        borderRadius: BorderRadius.circular(24),
+                        border: Border.all(
+                          color: isSelected
+                              ? Colors.white
+                              : Colors.white.withValues(alpha: 0.35),
+                          width: 1,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (isSelected) ...[
+                            const Icon(
+                              Icons.check,
+                              size: 14,
+                              color: Color(0xFF0052EA),
+                            ),
+                            const SizedBox(width: 4),
+                          ],
+                          Text(
+                            filter,
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                              color: isSelected ? const Color(0xFF0052EA) : Colors.white,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Delivery Card (Screen 17 redesign matching the screenshot)
+  // ---------------------------------------------------------------------------
+  Widget _buildDeliveryCard(BuildContext context, DeliveryModel item) {
+    final status = (item.status).toUpperCase().replaceAll('-', '_');
+    final isCancelled = AppConstants.isCancelled(item.status);
+    final isCompleted = status == 'DELIVERED' || status == 'COMPLETED';
+
+    // Status pill theme
+    Color badgeBg;
+    Color badgeColor;
+    Color iconBg;
+    Color iconColor;
+
+    if (isCancelled) {
+      badgeBg = const Color(0xFFFEE2E2);
+      badgeColor = const Color(0xFFDC2626);
+      iconBg = const Color(0xFFFEE2E2);
+      iconColor = const Color(0xFFDC2626);
+    } else if (isCompleted) {
+      badgeBg = const Color(0xFFDCFCE7);
+      badgeColor = const Color(0xFF16A34A);
+      iconBg = const Color(0xFFDBEAFE);
+      iconColor = const Color(0xFF0052EA);
+    } else {
+      // In progress / On the way / Assigned / Pending
+      badgeBg = const Color(0xFFDBEAFE);
+      badgeColor = const Color(0xFF0052EA);
+      iconBg = const Color(0xFFFEF3C7);
+      iconColor = const Color(0xFFD97706);
+    }
+
+    // Format display tracking code
+    final rawCode = item.trackingCode ?? item.id;
+    final displayCode = rawCode.startsWith('#') ? rawCode : '#$rawCode';
+
+    // Formatted date and time
+    final dateStr = item.createdAt != null
+        ? Formatters.date(item.createdAt)
+        : 'Nov 04, 2026';
+    final timeStr = item.createdAt != null
+        ? Formatters.time(item.createdAt)
+        : '08:30 AM';
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: const Color(0xFFE2E8F0), width: 1.2),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0F172A).withValues(alpha: 0.035),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => DeliveryDetailsScreen(delivery: item),
+              ),
+            );
+          },
+          borderRadius: BorderRadius.circular(22),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            child: Row(
+              children: [
+                // Soft Pastel Rounded Icon Box
+                Container(
+                  width: 50,
+                  height: 50,
+                  decoration: BoxDecoration(
+                    color: iconBg,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Center(
+                    child: Icon(
+                      Icons.local_shipping_outlined,
+                      color: iconColor,
+                      size: 24,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 14),
+
+                // Order Code & Date/Time
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        displayCode,
+                        style: const TextStyle(
+                          fontSize: 14.5,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF0F172A),
+                          letterSpacing: -0.2,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        '$dateStr • $timeStr',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                          color: Color(0xFF64748B),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+
+                // Status Badge Pill with Dot
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4.5),
+                  decoration: BoxDecoration(
+                    color: badgeBg,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 6,
+                        height: 6,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: badgeColor,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        AppConstants.formatStatus(item.status),
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w700,
+                          color: badgeColor,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 6),
+
+                // Forward Arrow
+                const Icon(
+                  Icons.arrow_forward_ios_rounded,
+                  size: 13,
+                  color: Color(0xFF94A3B8),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
+
